@@ -1,0 +1,10 @@
+# Virtual environment
+__pycache__/
+*.pyc
+
+# Fuseki log files 
+run/
+
+# Test pictures
+*.svg
+*.png
