@@ -26,7 +26,7 @@ neighbor_dir = os.path.join(current_dir, "edam")
 bioschemas_file = os.path.join(neighbor_dir, "bioschemas-dump_05_01_2025.ttl")
 edam_file = os.path.join(neighbor_dir, "EDAM_1.25.owl")
 
-'''
+"""
 dfTool = pd.read_csv("Dataframe/dfTool.tsv.bz2", sep="\t") #all Tool and toolLabel
 dfToolallmetrics = pd.read_csv("Dataframe/dfToolallmetrics.tsv.bz2", sep="\t")#All tool metrics on transitive Topic and Operation
 dfToolmetrics = pd.read_csv("Dataframe/dfToolmetrics.tsv.bz2", sep="\t")
@@ -51,7 +51,7 @@ dfTopicmetrics_NT = pd.read_csv("Dataframe/dfTopicmetrics_NT.tsv.bz2", sep="\t")
 nbTools = len(dfTool)
 nbToolsWithTopic = dfToolTopic["tool"].nunique()
 nbToolsWithOperation = dfToolOperation["tool"].nunique()
-'''
+"""
 
 # Configuration SPARQL end point
 endpointURL = "http://localhost:3030/biotoolsEdam/query"
@@ -1592,7 +1592,9 @@ def get_tools_topics_transitive_dataframe() -> pd.DataFrame:
     """
 
     dfToolTopicTransitive = sparqldataframe.query(endpointURL, prefixes + query)
-    dfToolTopicTransitive.to_csv("Dataframe/dfToolTopicTransitive.tsv.bz2", sep="\t", index=False)
+    dfToolTopicTransitive.to_csv(
+        "Dataframe/dfToolTopicTransitive.tsv.bz2", sep="\t", index=False
+    )
     return dfToolTopicTransitive
 
 
@@ -1644,7 +1646,9 @@ def get_tools_operations_transitive_dataframe() -> pd.DataFrame:
     """
 
     dfToolOperationTransitive = sparqldataframe.query(endpointURL, prefixes + query)
-    dfToolOperationTransitive.to_csv("Dataframe/dfToolOperationTransitive.tsv.bz2", sep="\t", index=False)
+    dfToolOperationTransitive.to_csv(
+        "Dataframe/dfToolOperationTransitive.tsv.bz2", sep="\t", index=False
+    )
     return dfToolOperationTransitive
 
 
@@ -1701,11 +1705,13 @@ def get_dftools_with_nbTopics_nbOperations(
 
     # Save to compressed TSV
     dfTool.to_csv(output_path, sep="\t", index=False, compression="bz2")
-    
+
     return dfTool
 
 
-def generate_df_redundancy_topic(output_path: str = "Dataframe/dfToolTopic_redundancy.tsv.bz2") -> pd.DataFrame:
+def generate_df_redundancy_topic(
+    output_path: str = "Dataframe/dfToolTopic_redundancy.tsv.bz2",
+) -> pd.DataFrame:
     """
     Generate the df_redundancy_topic DataFrame by running a SPARQL query using
     pre-defined global variables (endpointURL, prefixes, edamURI), and save it
@@ -1753,25 +1759,33 @@ def generate_df_redundancy_topic(output_path: str = "Dataframe/dfToolTopic_redun
     # Extract results into a list of dictionaries
     data = [
         {
-            "Tool": result['tool']['value'].replace(edamURI, ''),
-            "Direct Topic ID": edamURI + result.get('directTopic', {}).get('value', '').replace(edamURI, ''),
-            "Direct Topic Label": result.get('directTopicLabel', {}).get('value', ''),
-            "Redundant Topic ID": edamURI + result.get('redundantDirectTopic', {}).get('value', '').replace(edamURI, ''),
-            "Redundant Topic Label": result.get('redundantDirectTopicLabel', {}).get('value', '')
+            "Tool": result["tool"]["value"].replace(edamURI, ""),
+            "Direct Topic ID": edamURI
+            + result.get("directTopic", {}).get("value", "").replace(edamURI, ""),
+            "Direct Topic Label": result.get("directTopicLabel", {}).get("value", ""),
+            "Redundant Topic ID": edamURI
+            + result.get("redundantDirectTopic", {})
+            .get("value", "")
+            .replace(edamURI, ""),
+            "Redundant Topic Label": result.get("redundantDirectTopicLabel", {}).get(
+                "value", ""
+            ),
         }
         for result in results["results"]["bindings"]
     ]
 
     # Create DataFrame
     df_redundancy_topic = pd.DataFrame(data)
-    
+
     # Save to compressed TSV
     df_redundancy_topic.to_csv(output_path, sep="\t", index=False, compression="bz2")
 
     return df_redundancy_topic
 
 
-def generate_df_redundancy_operation(output_path: str = "Dataframe/dfToolOperation_redundancy.tsv.bz2") -> pd.DataFrame:
+def generate_df_redundancy_operation(
+    output_path: str = "Dataframe/dfToolOperation_redundancy.tsv.bz2",
+) -> pd.DataFrame:
     """
     Run a SPARQL query using pre-defined variables (endpointURL, prefixes, edamURI)
     and save the redundancy operation results as a compressed .tsv.bz2 file.
@@ -1807,274 +1821,217 @@ def generate_df_redundancy_operation(output_path: str = "Dataframe/dfToolOperati
     # Parse results
     data = [
         {
-            "Tool": result['tool']['value'].replace(edamURI, ''),
-            "Direct Operation ID": edamURI + result.get('directOperation', {}).get('value', '').replace(edamURI, ''),
-            "Direct Operation Label": result.get('directOperationLabel', {}).get('value', ''),
-            "Redundant Operation ID": edamURI + result.get('redundantDirectOperation', {}).get('value', '').replace(edamURI, ''),
-            "Redundant Operation Label": result.get('redundantDirectOperationLabel', {}).get('value', '')
+            "Tool": result["tool"]["value"].replace(edamURI, ""),
+            "Direct Operation ID": edamURI
+            + result.get("directOperation", {}).get("value", "").replace(edamURI, ""),
+            "Direct Operation Label": result.get("directOperationLabel", {}).get(
+                "value", ""
+            ),
+            "Redundant Operation ID": edamURI
+            + result.get("redundantDirectOperation", {})
+            .get("value", "")
+            .replace(edamURI, ""),
+            "Redundant Operation Label": result.get(
+                "redundantDirectOperationLabel", {}
+            ).get("value", ""),
         }
         for result in results["results"]["bindings"]
     ]
 
     # Create DataFrame
     df_redundancy_operation = pd.DataFrame(data)
-    
 
     # Save to compressed TSV
-    df_redundancy_operation.to_csv(output_path, sep="\t", index=False, compression="bz2")
-    
+    df_redundancy_operation.to_csv(
+        output_path, sep="\t", index=False, compression="bz2"
+    )
+
     return df_redundancy_operation
 
 
 def generate_df_topic_no_redundancy(
-    output_path: str = "Dataframe/df_topic_no_redundancy.tsv.bz2"
+    dfToolTopic_path="Dataframe/dfToolTopic.tsv.bz2",
+    df_redundancy_topic_path="Dataframe/dfToolTopic_redundancy.tsv.bz2",
+    output_path="Dataframe/df_topic_no_redundancy.tsv.bz2",
 ) -> pd.DataFrame:
     """
-    Remove redundant (tool, topic) pairs from dfToolTopic using df_redundancy_topic
-    and save the filtered dataframe to a compressed .tsv.bz2 file.
-
-    Uses global variables:
-      - dfToolTopic
-      - df_redundancy_topic
-
-    Parameters
-    ----------
-    output_path : str, optional
-        File path to save the filtered DataFrame.
-        Default is "results/df_topic_no_redundancy.tsv.bz2".
-
-    Returns
-    -------
-    pd.DataFrame
-        Filtered DataFrame with redundant topics removed.
+    Compute df_topic_no_redundancy using already-generated files.
     """
 
-    # Build set of redundant (Tool, Redundant Topic ID) pairs
-    redundant_pairs_topic = set(zip(
-        df_redundancy_topic["Tool"],
-        df_redundancy_topic["Redundant Topic ID"]
-    ))
+    # Load both dataframes instead of using globals
+    dfToolTopic = pd.read_csv(dfToolTopic_path, sep="\t", compression="bz2")
+    df_redundancy_topic = pd.read_csv(
+        df_redundancy_topic_path, sep="\t", compression="bz2"
+    )
 
-    # Filter dfToolTopic to remove redundant pairs
+    # Build a set of redundant (Tool, Redundant Topic ID)
+    redundant_pairs = set(
+        zip(df_redundancy_topic["Tool"], df_redundancy_topic["Redundant Topic ID"])
+    )
+
+    # Apply filtering
     df_topic_no_redundancy = dfToolTopic[
-        ~dfToolTopic[["tool", "topic"]].apply(tuple, axis=1).isin(redundant_pairs_topic)
+        ~dfToolTopic[["tool", "topic"]].apply(tuple, axis=1).isin(redundant_pairs)
     ]
 
-    # Save to compressed TSV
     df_topic_no_redundancy.to_csv(output_path, sep="\t", index=False, compression="bz2")
 
     return df_topic_no_redundancy
 
 
 def generate_df_operation_no_redundancy(
-    output_path: str = "Dataframe/df_operation_no_redundancy.tsv.bz2"
+    dfToolOperation_path="Dataframe/dfToolOperation.tsv.bz2",
+    df_redundancy_operation_path="Dataframe/dfToolOperation_redundancy.tsv.bz2",
+    output_path="Dataframe/df_operation_no_redundancy.tsv.bz2",
 ) -> pd.DataFrame:
     """
-    Remove redundant (tool, operation) pairs from dfToolOperation using df_redundancy_operation
-    and save the filtered dataframe to a compressed .tsv.bz2 file.
-
-    Uses global variables:
-      - dfToolOperation
-      - df_redundancy_operation
-
-    Parameters
-    ----------
-    output_path : str, optional
-        File path to save the filtered DataFrame.
-        Default is "results/df_operation_no_redundancy.tsv.bz2".
-
-    Returns
-    -------
-    pd.DataFrame
-        Filtered DataFrame with redundant operations removed.
+    Compute df_operation_no_redundancy using already-generated files.
     """
 
-    # Build set of redundant (Tool, Redundant Operation ID) pairs
-    redundant_pairs_operation = set(zip(
-        df_redundancy_operation["Tool"],
-        df_redundancy_operation["Redundant Operation ID"]
-    ))
+    dfToolOperation = pd.read_csv(dfToolOperation_path, sep="\t", compression="bz2")
+    df_redundancy_operation = pd.read_csv(
+        df_redundancy_operation_path, sep="\t", compression="bz2"
+    )
 
-    # Filter dfToolOperation to remove redundant pairs
+    redundant_pairs = set(
+        zip(
+            df_redundancy_operation["Tool"],
+            df_redundancy_operation["Redundant Operation ID"],
+        )
+    )
+
     df_operation_no_redundancy = dfToolOperation[
-        ~dfToolOperation[["tool", "operation"]].apply(tuple, axis=1).isin(redundant_pairs_operation)
+        ~dfToolOperation[["tool", "operation"]]
+        .apply(tuple, axis=1)
+        .isin(redundant_pairs)
     ]
 
-    # Save to compressed TSV
-    df_operation_no_redundancy.to_csv(output_path, sep="\t", index=False, compression="bz2")
+    df_operation_no_redundancy.to_csv(
+        output_path, sep="\t", index=False, compression="bz2"
+    )
 
     return df_operation_no_redundancy
 
 
 def generate_dfTool_transitive(
-    output_path: str = "Dataframe/dfTool_Transitive.tsv.bz2"
+    dfTool_path="Dataframe/dfTool.tsv.bz2",
+    dfToolTopicTransitive_path="Dataframe/dfToolTopicTransitive.tsv.bz2",
+    dfToolOperationTransitive_path="Dataframe/dfToolOperationTransitive.tsv.bz2",
+    output_path="Dataframe/dfTool_Transitive.tsv.bz2",
 ) -> pd.DataFrame:
     """
-    Generate dfTool with nbTopics and nbOperations based on transitive closures
-    and save it to a compressed .tsv.bz2 file.
-
-    Uses global variables:
-      - dfTool
-      - dfToolTopicTransitive
-      - dfToolOperationTransitive
-
-    Parameters
-    ----------
-    output_path : str, optional
-        File path to save the resulting DataFrame.
-        Default is "results/dfTool_Transitive.tsv.bz2".
-
-    Returns
-    -------
-    pd.DataFrame
-        Updated dfTool DataFrame with transitive nbTopics and nbOperations.
+    Generate dfTool with nbTopics and nbOperations based on transitive closures,
+    using already-generated TSV files instead of global variables.
     """
 
-    # Step 1: Compute number of topics per tool
-    dfToolNbTopics = (
-        dfToolTopicTransitive
-        .groupby("tool")
-        .size()
-        .reset_index(name="nbTopics")
-        .sort_values(by="nbTopics", ascending=False)
+    # Load required dataframes
+    dfTool = pd.read_csv(dfTool_path, sep="\t", compression="bz2")
+    dfToolTopicTransitive = pd.read_csv(
+        dfToolTopicTransitive_path, sep="\t", compression="bz2"
+    )
+    dfToolOperationTransitive = pd.read_csv(
+        dfToolOperationTransitive_path, sep="\t", compression="bz2"
     )
 
-    # Step 2: Compute number of operations per tool
+    # Number of topic matches (transitive)
+    dfToolNbTopics = (
+        dfToolTopicTransitive.groupby("tool").size().reset_index(name="nbTopics")
+    )
+
+    # Number of operation matches (transitive)
     dfToolNbOperations = (
-        dfToolOperationTransitive
-        .groupby("tool")
+        dfToolOperationTransitive.groupby("tool")
         .size()
         .reset_index(name="nbOperations")
-        .sort_values(by="nbOperations", ascending=False)
     )
 
-    # Step 3: Join counts to dfTool
+    # Join with dfTool
     dfTool_T = dfTool.copy()
     dfTool_T = dfTool_T.join(dfToolNbTopics.set_index("tool"), on="tool")
     dfTool_T = dfTool_T.join(dfToolNbOperations.set_index("tool"), on="tool")
 
-    # Step 4: Fill missing values and convert types
+    # Fill missing values
     dfTool_T["nbTopics"] = dfTool_T["nbTopics"].fillna(0).astype(int)
     dfTool_T["nbOperations"] = dfTool_T["nbOperations"].fillna(0).astype(int)
 
-    # Step 5: Save to compressed TSV
     dfTool_T.to_csv(output_path, sep="\t", index=False, compression="bz2")
-
     return dfTool_T
 
 
-
 def generate_dfTool_no_transitive(
-    output_path: str = "Dataframe/dfTool_NoTransitive.tsv.bz2"
+    dfTool_path="Dataframe/dfTool.tsv.bz2",
+    dfToolTopic_path="Dataframe/dfToolTopic.tsv.bz2",
+    dfToolOperation_path="Dataframe/dfToolOperation.tsv.bz2",
+    output_path="Dataframe/dfTool_NoTransitive.tsv.bz2",
 ) -> pd.DataFrame:
     """
-    Generate dfTool with nbTopics and nbOperations without transitive closure
-    and save it to a compressed .tsv.bz2 file.
-
-    Uses global variables:
-      - dfTool
-      - dfToolTopic
-      - dfToolOperation
-
-    Parameters
-    ----------
-    output_path : str, optional
-        File path to save the resulting DataFrame.
-        Default is "results/dfTool_NoTransitive.tsv.bz2".
-
-    Returns
-    -------
-    pd.DataFrame
-        Updated dfTool DataFrame with nbTopics and nbOperations (non-transitive).
+    Generate dfTool with nbTopics and nbOperations without transitive closure,
+    using already-generated TSV files instead of global variables.
     """
 
-    # Step 1: Compute number of topics per tool
-    dfToolNbTopics = (
-        dfToolTopic
-        .groupby("tool")
-        .size()
-        .reset_index(name="nbTopics")
-        .sort_values(by="nbTopics", ascending=False)
-    )
+    # Load required dataframes
+    dfTool = pd.read_csv(dfTool_path, sep="\t", compression="bz2")
+    dfToolTopic = pd.read_csv(dfToolTopic_path, sep="\t", compression="bz2")
+    dfToolOperation = pd.read_csv(dfToolOperation_path, sep="\t", compression="bz2")
 
-    # Step 2: Compute number of operations per tool
+    # Number of topic matches (non-transitive)
+    dfToolNbTopics = dfToolTopic.groupby("tool").size().reset_index(name="nbTopics")
+
+    # Number of operation matches (non-transitive)
     dfToolNbOperations = (
-        dfToolOperation
-        .groupby("tool")
-        .size()
-        .reset_index(name="nbOperations")
-        .sort_values(by="nbOperations", ascending=False)
+        dfToolOperation.groupby("tool").size().reset_index(name="nbOperations")
     )
 
-    # Step 3: Join counts to dfTool
+    # Join with dfTool
     dfTool_NT = dfTool.copy()
     dfTool_NT = dfTool_NT.join(dfToolNbTopics.set_index("tool"), on="tool")
     dfTool_NT = dfTool_NT.join(dfToolNbOperations.set_index("tool"), on="tool")
 
-    # Step 4: Fill missing values and convert types
+    # Fill missing values
     dfTool_NT["nbTopics"] = dfTool_NT["nbTopics"].fillna(0).astype(int)
     dfTool_NT["nbOperations"] = dfTool_NT["nbOperations"].fillna(0).astype(int)
 
-    # Step 5: Save to compressed TSV
     dfTool_NT.to_csv(output_path, sep="\t", index=False, compression="bz2")
-
     return dfTool_NT
 
 
 def generate_dfTool_no_transitive_no_redundancy(
-    output_path: str = "Dataframe/dfTool_NoTransitive_NoRedundancy.tsv.bz2"
+    dfTool_path="Dataframe/dfTool.tsv.bz2",
+    df_topic_no_redundancy_path="Dataframe/df_topic_no_redundancy.tsv.bz2",
+    df_operation_no_redundancy_path="Dataframe/df_operation_no_redundancy.tsv.bz2",
+    output_path="Dataframe/dfTool_NoTransitive_NoRedundancy.tsv.bz2",
 ) -> pd.DataFrame:
-    """
-    Generate dfTool with nbTopics and nbOperations based on non-transitive
-    data after removing redundant topics and operations.
 
-    Uses global variables:
-      - dfTool
-      - df_topic_no_redundancy
-      - df_operation_no_redundancy
-
-    Parameters
-    ----------
-    output_path : str, optional
-        File path to save the resulting DataFrame. If None, does not save.
-
-    Returns
-    -------
-    pd.DataFrame
-        Updated dfTool DataFrame with nbTopics and nbOperations after removing redundancy.
-    """
-
-    # Step 1: Compute number of topics per tool
-    dfToolNbTopics = (
-        df_topic_no_redundancy
-        .groupby("tool")
-        .size()
-        .reset_index(name="nbTopics")
-        .sort_values(by="nbTopics", ascending=False)
+    dfTool = pd.read_csv(dfTool_path, sep="\t", compression="bz2")
+    df_topic_no_redundancy = pd.read_csv(
+        df_topic_no_redundancy_path, sep="\t", compression="bz2"
+    )
+    df_operation_no_redundancy = pd.read_csv(
+        df_operation_no_redundancy_path, sep="\t", compression="bz2"
     )
 
-    # Step 2: Compute number of operations per tool
+    # nbTopics
+    dfToolNbTopics = (
+        df_topic_no_redundancy.groupby("tool").size().reset_index(name="nbTopics")
+    )
+
+    # nbOperations
     dfToolNbOperations = (
-        df_operation_no_redundancy
-        .groupby("tool")
+        df_operation_no_redundancy.groupby("tool")
         .size()
         .reset_index(name="nbOperations")
-        .sort_values(by="nbOperations", ascending=False)
     )
 
-    # Step 3: Join counts to dfTool
-    dfTool_NT_redundancy = dfTool.copy()
-    dfTool_NT_redundancy = dfTool_NT_redundancy.join(dfToolNbTopics.set_index("tool"), on="tool")
-    dfTool_NT_redundancy = dfTool_NT_redundancy.join(dfToolNbOperations.set_index("tool"), on="tool")
+    dfTool_NR = dfTool.copy()
+    dfTool_NR = dfTool_NR.join(dfToolNbTopics.set_index("tool"), on="tool")
+    dfTool_NR = dfTool_NR.join(dfToolNbOperations.set_index("tool"), on="tool")
 
-    # Step 4: Fill missing values and convert types
-    dfTool_NT_redundancy["nbTopics"] = dfTool_NT_redundancy["nbTopics"].fillna(0).astype(int)
-    dfTool_NT_redundancy["nbOperations"] = dfTool_NT_redundancy["nbOperations"].fillna(0).astype(int)
+    dfTool_NR["nbTopics"] = dfTool_NR["nbTopics"].fillna(0).astype(int)
+    dfTool_NR["nbOperations"] = dfTool_NR["nbOperations"].fillna(0).astype(int)
 
+    dfTool_NR.to_csv(output_path, sep="\t", index=False, compression="bz2")
 
-    dfTool_NT_redundancy.to_csv(output_path, sep="\t", index=False, compression="bz2")
-
-    return dfTool_NT_redundancy
+    return dfTool_NR
 
 
 def get_dfToolTopic_NotOWLClass() -> pd.DataFrame:
@@ -2113,7 +2070,7 @@ def get_dfToolTopic_NotOWLClass() -> pd.DataFrame:
         "Dataframe/dfToolTopic_NotOWLClass.tsv.bz2",
         sep="\t",
         index=False,
-        compression="bz2"
+        compression="bz2",
     )
 
     return dfToolTopic_NotOWLClass
@@ -2155,9 +2112,7 @@ def get_dfTool_ObsoleteOperation() -> pd.DataFrame:
         "Dataframe/dfTool_ObsoleteOperation.tsv.bz2",
         sep="\t",
         index=False,
-        compression="bz2"
+        compression="bz2",
     )
 
     return dfTool_ObsoleteOperation
-
-
