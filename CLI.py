@@ -81,11 +81,11 @@ def initialize(bioschemas_file, edam_file):
     click.echo("=== EDAMannot Initialization ===")
 
     # ------------------------------------------------------------
-    # STEP 1 — Launch Fuseki server (with defaults if none given)
+    # STEP 1 — Launch Fuseki server
     # ------------------------------------------------------------
     fuseki = launch_fuseki_server(bioschemas_file=bioschemas_file, edam_file=edam_file)
 
-    click.echo("\n=== STEP 2 — Generating Dataframes ===")
+    click.echo("\n=== Query bioschemas-file, generate and calculate dataframes ===")
     os.makedirs("Dataframe", exist_ok=True)
 
     generated_files = []
@@ -175,12 +175,38 @@ def initialize(bioschemas_file, edam_file):
         click.echo("→ Getting dfTool_ObsoleteOperation")
         dfTool_ObsoleteOperation = edam.get_dfTool_ObsoleteOperation()
         generated_files.append("Dataframe/dfTool_ObsoleteOperation.tsv.bz2")
+        
+# ------------------------------------------------------------------
+        # 7) METRICS TABLES
+        # ------------------------------------------------------------------
+        click.echo("→ Compute dfTopicmetrics")
+        dfTopicmetrics = edam.compute_topic_metrics()
+        generated_files.append("Dataframe/dfTopicmetrics.tsv.bz2")
+        
+        click.echo("→ Compute dfTopicmetrics_NT")
+        dfTopicmetrics_NT = edam.compute_topic_metrics_NT()
+        generated_files.append("Dataframe/dfTopicmetrics_NT.tsv.bz2")
 
+        click.echo("→ Compute dfOperationmetrics")
+        dfOperationmetrics = edam.compute_operation_metrics()
+        generated_files.append("Dataframe/dfOperationmetrics.tsv.bz2")
+        
+        click.echo("→ Compute dfOperationmetrics_NT")
+        dfOperationmetrics_NT = edam.compute_operation_metrics_NT()
+        generated_files.append("Dataframe/dfOperationmetrics_NT.tsv.bz2")
+        
+        click.echo("→ Compute dfToolallmetrics")
+        dfToolallmetrics = edam.compute_tool_metrics_with_transitive()
+        generated_files.append("Dataframe/dfToolallmetrics.tsv.bz2")
+        
+        click.echo("→ Compute dfToolallmetrics_NT")
+        dfToolallmetrics_NT = edam.compute_tool_metrics_non_transitive()
+        generated_files.append("Dataframe/dfToolallmetrics_NT.tsv.bz2")
+        
         # ------------------------------------------------------------
         # SUCCESS
         # ------------------------------------------------------------
-        click.echo("\n=== STEP 3 — COMPLETED ===")
-        click.echo("Generated files:")
+        click.echo("\n=== Generated files: ===")
         for f in generated_files:
             click.echo(f"  - {f}")
 

@@ -26,8 +26,16 @@ neighbor_dir = os.path.join(current_dir, "edam")
 bioschemas_file = os.path.join(neighbor_dir, "bioschemas-dump_05_01_2025.ttl")
 edam_file = os.path.join(neighbor_dir, "EDAM_1.25.owl")
 
+
+dfTool = pd.read_csv("Dataframe/dfTool.tsv.bz2", sep="\t")  # all Tool and toolLabel
+dfToolTopic = pd.read_csv(
+    "Dataframe/dfToolTopic.tsv.bz2", sep="\t"
+)  # Tool, topic, topicLabel no transitive
+dfToolOperation = pd.read_csv(
+    "Dataframe/dfToolOperation.tsv.bz2", sep="\t"
+)  # tool, operation, operationLabel no transitive
+
 """
-dfTool = pd.read_csv("Dataframe/dfTool.tsv.bz2", sep="\t") #all Tool and toolLabel
 dfToolallmetrics = pd.read_csv("Dataframe/dfToolallmetrics.tsv.bz2", sep="\t")#All tool metrics on transitive Topic and Operation
 dfToolmetrics = pd.read_csv("Dataframe/dfToolmetrics.tsv.bz2", sep="\t")
 dfToolTopic = pd.read_csv("Dataframe/dfToolTopic.tsv.bz2", sep="\t")#Tool, topic, topicLabel no transitive
@@ -47,11 +55,11 @@ dfTopicmetrics = pd.read_csv("Dataframe/dfTopicmetrics.tsv.bz2", sep="\t")#frequ
 dfOperationmetrics = pd.read_csv("Dataframe/dfOperationmetrics.tsv.bz2", sep="\t")#frequence, IC and entroypy of operations unique metric inherited 
 dfOperationmetrics_NT = pd.read_csv("Dataframe/dfOperationmetrics_NT.tsv.bz2", sep="\t")#frequence, IC and entroypy of operations unique metric directly assigned
 dfTopicmetrics_NT = pd.read_csv("Dataframe/dfTopicmetrics_NT.tsv.bz2", sep="\t")#frequence, IC and entroypy of topics unique metric directly assigned
-
+"""
 nbTools = len(dfTool)
 nbToolsWithTopic = dfToolTopic["tool"].nunique()
 nbToolsWithOperation = dfToolOperation["tool"].nunique()
-"""
+
 
 # Configuration SPARQL end point
 endpointURL = "http://localhost:3030/biotoolsEdam/query"
@@ -1450,46 +1458,100 @@ def getToolScore(toolURI, transitive=False, dictTopicScore={}, dictOperationScor
     return toolScore
 
 
-def getMutualInformation(toolURI1, toolURI2, dictAnnotationPairsMutualInformation=None):
+def getMutualInformation(
+    toolURI1: str,
+    toolURI2: str,
+    dfToolTopicTransitive,
+    dfToolOperationTransitive,
+    nbToolsWithTopic: int,
+    dictAnnotationPairsMutualInformation: dict | None = None,
+):
+    """
+    Compute Mutual Information between two tools based on their
+    transitive EDAM Topic + Operation annotations.
+
+    Parameters
+    ----------
+    toolURI1 : str
+    toolURI2 : str
+    dfToolTopicTransitive : pd.DataFrame
+        DataFrame with columns ["tool", "topic"].
+    dfToolOperationTransitive : pd.DataFrame
+        DataFrame with columns ["tool", "operation"].
+    nbToolsWithTopic : int
+        Total number of tools (normalizing denominator).
+    dictAnnotationPairsMutualInformation : dict, optional
+        Cache for mutual information computation.
+
+    Returns
+    -------
+    float
+        Mutual information score.
+    """
+
     mi = 0.0
-    annotT1 = dfToolTopicTransitive[dfToolTopicTransitive["tool"] == toolURI1][
-        "topic"
-    ].to_list()
-    annotT1 += dfToolOperationTransitive[dfToolOperationTransitive["tool"] == toolURI1][
-        "operation"
-    ].to_list()
-    annotT2 = dfToolTopicTransitive[dfToolTopicTransitive["tool"] == toolURI2][
-        "topic"
-    ].to_list()
-    annotT2 += dfToolOperationTransitive[dfToolOperationTransitive["tool"] == toolURI2][
-        "operation"
-    ].to_list()
-    for a1 in annotT1:
-        toolsA1 = set(
-            dfToolTopicTransitive[dfToolTopicTransitive["topic"] == a1]["tool"]
+
+    # ----------------------------
+    # Get annotation lists
+    # ----------------------------
+    annotT1 = (
+        dfToolTopicTransitive[dfToolTopicTransitive["tool"] == toolURI1][
+            "topic"
+        ].to_list()
+        + dfToolOperationTransitive[dfToolOperationTransitive["tool"] == toolURI1][
+            "operation"
+        ].to_list()
+    )
+
+    annotT2 = (
+        dfToolTopicTransitive[dfToolTopicTransitive["tool"] == toolURI2][
+            "topic"
+        ].to_list()
+        + dfToolOperationTransitive[dfToolOperationTransitive["tool"] == toolURI2][
+            "operation"
+        ].to_list()
+    )
+
+    # Pre-cache annotation -> tool sets for speed
+    topic2tools = {
+        topic: set(
+            dfToolTopicTransitive[dfToolTopicTransitive["topic"] == topic]["tool"]
         )
+        for topic in set(annotT1 + annotT2)
+    }
+
+    # ----------------------------
+    # Compute MI
+    # ----------------------------
+    for a1 in annotT1:
+
+        toolsA1 = topic2tools[a1]
         pa1 = len(toolsA1) / nbToolsWithTopic
 
         for a2 in annotT2:
+
+            # Check cached value
             if dictAnnotationPairsMutualInformation is not None:
-                if (a1, a2) in dictAnnotationPairsMutualInformation.keys():
+                if (a1, a2) in dictAnnotationPairsMutualInformation:
                     mi += dictAnnotationPairsMutualInformation[(a1, a2)]
                     continue
-            toolsA2 = set(
-                dfToolTopicTransitive[dfToolTopicTransitive["topic"] == a2]["tool"]
-            )
+
+            toolsA2 = topic2tools[a2]
             pa2 = len(toolsA2) / nbToolsWithTopic
             pa1a2 = len(toolsA1.intersection(toolsA2)) / nbToolsWithTopic
 
-            # if  pa1 * pa2 * pa1a2 != 0:
-            #    mi += pa1a2 * np.log2( pa1a2 / (pa1 * pa2) )
-            result = (
-                pa1a2 * np.log2(pa1a2 / (pa1 * pa2)) if pa1 * pa2 * pa1a2 != 0 else 0
-            )
+            if pa1 * pa2 * pa1a2 != 0:
+                result = pa1a2 * np.log2(pa1a2 / (pa1 * pa2))
+            else:
+                result = 0.0
+
             mi += result
+
+            # Save cached values (symmetric)
             if dictAnnotationPairsMutualInformation is not None:
                 dictAnnotationPairsMutualInformation[(a1, a2)] = result
                 dictAnnotationPairsMutualInformation[(a2, a1)] = result
+
     return mi
 
 
@@ -2116,3 +2178,473 @@ def get_dfTool_ObsoleteOperation() -> pd.DataFrame:
     )
 
     return dfTool_ObsoleteOperation
+
+
+def compute_topic_metrics(
+    dfToolTopicTransitive_path="Dataframe/dfToolTopicTransitive.tsv.bz2",
+    output_path="Dataframe/dfTopicmetrics.tsv.bz2",
+) -> pd.DataFrame:
+    """
+    Compute topic metrics including Information Content (IC) and entropy
+    Parameters:
+    -----------
+    dfToolTopicTransitive_path : str
+        Path to the transitive tool-topic dataframe
+    output_path : str
+        Path to save the topic metrics dataframe
+
+    Returns:
+    --------
+    pd.DataFrame
+        Dataframe containing topic metrics
+    """
+
+    # Read input dataframes
+    dfToolTopicTransitive = pd.read_csv(
+        dfToolTopicTransitive_path, sep="\t", compression="bz2"
+    )
+
+    # Calculate number of tools per topic
+    dfTopicNbTools = (
+        dfToolTopicTransitive[["tool", "topic"]]
+        .groupby(by="topic")
+        .size()
+        .reset_index(name="nbTools")
+        .sort_values(by="nbTools", ascending=False)
+    )
+
+    # Create topic dataframe with unique topics and their labels
+    dfTopic = (
+        dfToolTopicTransitive[["topic", "topicLabel"]]
+        .drop_duplicates(subset=["topic", "topicLabel"], keep="first")
+        .reset_index(drop=True)
+    )
+
+    # Join with tool counts
+    dfTopic = dfTopic.join(dfTopicNbTools.set_index("topic"), on="topic")
+
+    # Calculate total number of tools with topics
+    nbToolsWithTopic = dfToolTopicTransitive["tool"].nunique()
+
+    # Calculate metrics
+    dfTopic["frequence"] = dfTopic["nbTools"] / nbToolsWithTopic
+    dfTopic["IC"] = -np.log2(dfTopic["frequence"])
+    dfTopic["entropy"] = dfTopic["frequence"] * dfTopic["IC"]
+
+    # Save results
+    dfTopic.to_csv(output_path, sep="\t", index=False, compression="bz2")
+    dfTopicmetrics = dfTopic
+
+    return dfTopicmetrics
+
+
+def compute_topic_metrics_NT(
+    dfToolTopic_path="Dataframe/dfToolTopic.tsv.bz2",
+    output_path="Dataframe/dfTopicmetrics_NT.tsv.bz2",
+) -> pd.DataFrame:
+    """
+    Compute topic metrics without transitive closure including Information Content (IC) and entropy,
+    and save the results to global variables.
+
+    Parameters:
+    -----------
+    dfToolTopic_path : str
+        Path to the tool-topic dataframe (without transitive closure)
+    output_path : str
+        Path to save the topic metrics dataframe
+
+    Returns:
+    --------
+    pd.DataFrame
+        Dataframe containing topic metrics without transitive closure
+    """
+
+    # Read input dataframes
+    dfToolTopic = pd.read_csv(dfToolTopic_path, sep="\t", compression="bz2")
+
+    # Calculate total number of tools with topics
+    nbToolsWithTopic = dfToolTopic["tool"].nunique()
+
+    # Calculate number of tools per topic
+    dfTopicNbTools = (
+        dfToolTopic[["tool", "topic"]]
+        .groupby(by="topic")
+        .size()
+        .reset_index(name="nbTools")
+        .sort_values(by="nbTools", ascending=False)
+    )
+
+    # Create topic dataframe with unique topics and their labels
+    dfTopic = (
+        dfToolTopic[["topic", "topicLabel"]]
+        .drop_duplicates(subset=["topic", "topicLabel"], keep="first")
+        .reset_index(drop=True)
+    )
+
+    # Join with tool counts
+    dfTopic = dfTopic.join(dfTopicNbTools.set_index("topic"), on="topic")
+
+    # Calculate metrics
+    dfTopic["frequence"] = dfTopic["nbTools"] / nbToolsWithTopic
+    dfTopic["IC"] = -np.log2(dfTopic["frequence"])
+    dfTopic["entropy"] = dfTopic["frequence"] * dfTopic["IC"]
+
+    # Save results
+    dfTopic.to_csv(output_path, sep="\t", index=False, compression="bz2")
+    dfTopicmetrics_NT = dfTopic
+
+    return dfTopicmetrics_NT
+
+
+def compute_operation_metrics(
+    dfToolOperationTransitive_path="Dataframe/dfToolOperationTransitive.tsv.bz2",
+    output_path="Dataframe/dfOperationmetrics.tsv.bz2",
+) -> pd.DataFrame:
+    """
+    Compute operation metrics including Information Content (IC) and entropy.
+
+    Parameters:
+    -----------
+    dfToolOperationTransitive_path : str
+        Path to the transitive tool-operation dataframe
+    dfTool_path : str
+        Path to the tool dataframe (to get total number of tools with operations)
+    output_path : str
+        Path to save the operation metrics dataframe
+
+    Returns:
+    --------
+    pd.DataFrame
+        Dataframe containing operation metrics
+    """
+
+    # Read input dataframes
+    dfToolOperationTransitive = pd.read_csv(
+        dfToolOperationTransitive_path, sep="\t", compression="bz2"
+    )
+
+    # Calculate total number of tools with operations
+    nbToolsWithOperation = dfToolOperationTransitive["tool"].nunique()
+
+    # Calculate number of tools per operation
+    dfOperationNbTools = (
+        dfToolOperationTransitive[["tool", "operation"]]
+        .groupby(by="operation")
+        .size()
+        .reset_index(name="nbTools")
+        .sort_values(by="nbTools", ascending=False)
+    )
+
+    # Create operation dataframe with unique operations and their labels
+    dfOperation = (
+        dfToolOperationTransitive[["operation", "operationLabel"]]
+        .drop_duplicates(subset=["operation", "operationLabel"], keep="first")
+        .reset_index(drop=True)
+    )
+
+    # Join with tool counts
+    dfOperation = dfOperation.join(
+        dfOperationNbTools.set_index("operation"), on="operation"
+    )
+
+    # Calculate metrics
+    dfOperation["frequence"] = dfOperation["nbTools"] / nbToolsWithOperation
+    dfOperation["IC"] = -np.log2(dfOperation["frequence"])
+    dfOperation["entropy"] = dfOperation["frequence"] * dfOperation["IC"]
+
+    # Save results
+    dfOperation.to_csv(output_path, sep="\t", index=False, compression="bz2")
+    dfOperationmetrics = dfOperation
+
+    return dfOperationmetrics
+
+
+def compute_operation_metrics_NT(
+    dfToolOperation_path="Dataframe/dfToolOperation.tsv.bz2",
+    output_path="Dataframe/dfOperationmetrics_NT.tsv.bz2",
+) -> pd.DataFrame:
+    """
+    Compute operation metrics without transitive closure including Information Content (IC) and entropy.
+
+    Parameters:
+    -----------
+    dfToolOperation_path : str
+        Path to the tool-operation dataframe (without transitive closure)
+    output_path : str
+        Path to save the operation metrics dataframe
+
+    Returns:
+    --------
+    pd.DataFrame
+        Dataframe containing operation metrics without transitive closure
+    """
+
+    # Read input dataframes
+    dfToolOperation = pd.read_csv(dfToolOperation_path, sep="\t", compression="bz2")
+
+    # Calculate total number of tools with operations
+    nbToolsWithOperation = dfToolOperation["tool"].nunique()
+
+    # Calculate number of tools per operation
+    dfOperationNbTools = (
+        dfToolOperation[["tool", "operation"]]
+        .groupby(by="operation")
+        .size()
+        .reset_index(name="nbTools")
+        .sort_values(by="nbTools", ascending=False)
+    )
+
+    # Create operation dataframe with unique operations and their labels
+    dfOperation = (
+        dfToolOperation[["operation", "operationLabel"]]
+        .drop_duplicates(subset=["operation", "operationLabel"], keep="first")
+        .reset_index(drop=True)
+    )
+
+    # Join with tool counts
+    dfOperation = dfOperation.join(
+        dfOperationNbTools.set_index("operation"), on="operation"
+    )
+
+    # Calculate metrics
+    dfOperation["frequence"] = dfOperation["nbTools"] / nbToolsWithOperation
+    dfOperation["IC"] = -np.log2(dfOperation["frequence"])
+    dfOperation["entropy"] = dfOperation["frequence"] * dfOperation["IC"]
+
+    # Save results
+    dfOperation.to_csv(output_path, sep="\t", index=False, compression="bz2")
+    dfOperationmetrics_NT = dfOperation
+
+    return dfOperationmetrics_NT
+
+
+def compute_tool_metrics_with_transitive(
+    dfToolTopicTransitive_path="Dataframe/dfToolTopicTransitive.tsv.bz2",
+    dfToolOperationTransitive_path="Dataframe/dfToolOperationTransitive.tsv.bz2",
+    dfTopic_metrics_path="Dataframe/dfTopicmetrics.tsv.bz2",
+    dfOperation_metrics_path="Dataframe/dfOperationmetrics.tsv.bz2",
+    dfTool_path="Dataframe/dfTool.tsv.bz2",
+    output_path="Dataframe/dfToolallmetrics.tsv.bz2",
+) -> pd.DataFrame:
+    """
+    Compute combined topic and operation metrics for tools using transitive relationships.
+
+    Parameters:
+    -----------
+    dfToolTopicTransitive_path : str
+        Path to the transitive tool-topic dataframe
+    dfToolOperationTransitive_path : str
+        Path to the transitive tool-operation dataframe
+    dfTopic_metrics_path : str
+        Path to the topic metrics dataframe
+    dfOperation_metrics_path : str
+        Path to the operation metrics dataframe
+    dfTool_path : str
+        Path to the tool dataframe
+    output_path : str
+        Path to save the combined tool metrics dataframe
+
+    Returns:
+    --------
+    pd.DataFrame
+        Dataframe containing tools with combined topic and operation metrics
+    """
+
+    # Read input dataframes
+    dfToolTopicTransitive = pd.read_csv(
+        dfToolTopicTransitive_path, sep="\t", compression="bz2"
+    )
+    dfToolOperationTransitive = pd.read_csv(
+        dfToolOperationTransitive_path, sep="\t", compression="bz2"
+    )
+    dfTopic = pd.read_csv(dfTopic_metrics_path, sep="\t", compression="bz2")
+    dfOperation = pd.read_csv(dfOperation_metrics_path, sep="\t", compression="bz2")
+    dfTool = pd.read_csv(dfTool_path, sep="\t", compression="bz2")
+
+    # Calculate topic scores
+    df_topic_scores = (
+        dfToolTopicTransitive.join(
+            dfTopic[["topic", "IC", "entropy"]].set_index("topic"), on="topic"
+        )[["tool", "IC"]]
+        .groupby(by="tool")
+        .sum()
+        .rename(columns={"IC": "topicScore"})
+        .reset_index()
+    )
+
+    dfTool = dfTool.join(df_topic_scores.set_index("tool"), on="tool")
+    dfTool["topicScore"] = dfTool["topicScore"].fillna(0)
+
+    # Calculate operation scores
+    df_operation_scores = (
+        dfToolOperationTransitive.join(
+            dfOperation[["operation", "IC", "entropy"]].set_index("operation"),
+            on="operation",
+        )[["tool", "IC"]]
+        .groupby(by="tool")
+        .sum()
+        .rename(columns={"IC": "operationScore"})
+        .reset_index()
+    )
+
+    dfTool = dfTool.join(df_operation_scores.set_index("tool"), on="tool")
+    dfTool["operationScore"] = dfTool["operationScore"].fillna(0)
+
+    # Calculate total score
+    dfTool["score"] = dfTool["topicScore"] + dfTool["operationScore"]
+
+    # Calculate topic entropy
+    df_topic_entropy = (
+        dfToolTopicTransitive.join(
+            dfTopic[["topic", "IC", "entropy"]].set_index("topic"), on="topic"
+        )[["tool", "entropy"]]
+        .groupby(by="tool")
+        .sum()
+        .rename(columns={"entropy": "topicEntropy"})
+        .reset_index()
+    )
+
+    dfTool = dfTool.join(df_topic_entropy.set_index("tool"), on="tool")
+    dfTool["topicEntropy"] = dfTool["topicEntropy"].fillna(0)
+
+    # Calculate operation entropy
+    df_operation_entropy = (
+        dfToolOperationTransitive.join(
+            dfOperation[["operation", "IC", "entropy"]].set_index("operation"),
+            on="operation",
+        )[["tool", "entropy"]]
+        .groupby(by="tool")
+        .sum()
+        .rename(columns={"entropy": "operationEntropy"})
+        .reset_index()
+    )
+
+    dfTool = dfTool.join(df_operation_entropy.set_index("tool"), on="tool")
+    dfTool["operationEntropy"] = dfTool["operationEntropy"].fillna(0)
+
+    # Calculate total entropy
+    dfTool["entropy"] = dfTool["topicEntropy"] + dfTool["operationEntropy"]
+
+    # Save results
+    dfTool.to_csv(output_path, sep="\t", index=False, compression="bz2")
+    dfToolallmetrics = dfTool
+
+    return dfToolallmetrics
+
+
+def compute_tool_metrics_non_transitive(
+    dfToolTopic_path="Dataframe/dfToolTopic.tsv.bz2",
+    dfToolOperation_path="Dataframe/dfToolOperation.tsv.bz2",
+    dfTopic_metrics_NT_path="Dataframe/dfTopicmetrics_NT.tsv.bz2",
+    dfOperation_metrics_NT_path="Dataframe/dfOperationmetrics_NT.tsv.bz2",
+    dfTool_path="Dataframe/dfTool.tsv.bz2",
+    output_path="Dataframe/dfToolallmetrics_NT.tsv.bz2",
+) -> pd.DataFrame:
+    """
+    Compute combined topic and operation metrics for tools using non-transitive relationships.
+
+    Parameters:
+    -----------
+    dfToolTopic_path : str
+        Path to the non-transitive tool-topic dataframe
+    dfToolOperation_path : str
+        Path to the non-transitive tool-operation dataframe
+    dfTopic_metrics_NT_path : str
+        Path to the non-transitive topic metrics dataframe
+    dfOperation_metrics_NT_path : str
+        Path to the non-transitive operation metrics dataframe
+    dfTool_path : str
+        Path to the tool dataframe
+    output_path : str
+        Path to save the combined tool metrics dataframe (non-transitive)
+
+    Returns:
+    --------
+    pd.DataFrame
+        Dataframe containing tools with combined topic and operation metrics (non-transitive)
+    """
+
+    # Read input dataframes
+    dfToolTopic = pd.read_csv(dfToolTopic_path, sep="\t", compression="bz2")
+    dfToolOperation = pd.read_csv(dfToolOperation_path, sep="\t", compression="bz2")
+    dfTopicmetrics_NT = pd.read_csv(
+        dfTopic_metrics_NT_path, sep="\t", compression="bz2"
+    )
+    dfOperationmetrics_NT = pd.read_csv(
+        dfOperation_metrics_NT_path, sep="\t", compression="bz2"
+    )
+    dfTool = pd.read_csv(dfTool_path, sep="\t", compression="bz2")
+
+    # Calculate topic scores (non-transitive)
+    df_topic_scores = (
+        dfToolTopic.join(
+            dfTopicmetrics_NT[["topic", "IC", "entropy"]].set_index("topic"), on="topic"
+        )[["tool", "IC"]]
+        .groupby(by="tool")
+        .sum()
+        .rename(columns={"IC": "topicScore"})
+        .reset_index()
+    )
+
+    dfTool = dfTool.join(df_topic_scores.set_index("tool"), on="tool")
+    dfTool["topicScore"] = dfTool["topicScore"].fillna(0)
+
+    # Calculate operation scores (non-transitive)
+    df_operation_scores = (
+        dfToolOperation.join(
+            dfOperationmetrics_NT[["operation", "IC", "entropy"]].set_index(
+                "operation"
+            ),
+            on="operation",
+        )[["tool", "IC"]]
+        .groupby(by="tool")
+        .sum()
+        .rename(columns={"IC": "operationScore"})
+        .reset_index()
+    )
+
+    dfTool = dfTool.join(df_operation_scores.set_index("tool"), on="tool")
+    dfTool["operationScore"] = dfTool["operationScore"].fillna(0)
+
+    # Calculate total score
+    dfTool["score"] = dfTool["topicScore"] + dfTool["operationScore"]
+
+    # Calculate topic entropy (non-transitive)
+    df_topic_entropy = (
+        dfToolTopic.join(
+            dfTopicmetrics_NT[["topic", "IC", "entropy"]].set_index("topic"), on="topic"
+        )[["tool", "entropy"]]
+        .groupby(by="tool")
+        .sum()
+        .rename(columns={"entropy": "topicEntropy"})
+        .reset_index()
+    )
+
+    dfTool = dfTool.join(df_topic_entropy.set_index("tool"), on="tool")
+    dfTool["topicEntropy"] = dfTool["topicEntropy"].fillna(0)
+
+    # Calculate operation entropy (non-transitive)
+    df_operation_entropy = (
+        dfToolOperation.join(
+            dfOperationmetrics_NT[["operation", "IC", "entropy"]].set_index(
+                "operation"
+            ),
+            on="operation",
+        )[["tool", "entropy"]]
+        .groupby(by="tool")
+        .sum()
+        .rename(columns={"entropy": "operationEntropy"})
+        .reset_index()
+    )
+
+    dfTool = dfTool.join(df_operation_entropy.set_index("tool"), on="tool")
+    dfTool["operationEntropy"] = dfTool["operationEntropy"].fillna(0)
+
+    # Calculate total entropy
+    dfTool["entropy"] = dfTool["topicEntropy"] + dfTool["operationEntropy"]
+
+    # Save results
+    dfTool.to_csv(output_path, sep="\t", index=False, compression="bz2")
+    dfToolallmetrics_NT = dfTool
+
+    return dfToolallmetrics_NT
