@@ -16,6 +16,7 @@ import scipy.stats as stats
 import sparqldataframe
 from SPARQLWrapper import SPARQLWrapper, JSON
 import time
+from typing import Union, List, Dict, Optional, Literal, Tuple
 
 
 # === Global variables ===
@@ -35,9 +36,8 @@ dfToolOperation = pd.read_csv(
     "Dataframe/dfToolOperation.tsv.bz2", sep="\t"
 )  # tool, operation, operationLabel no transitive
 
-"""
+
 dfToolallmetrics = pd.read_csv("Dataframe/dfToolallmetrics.tsv.bz2", sep="\t")#All tool metrics on transitive Topic and Operation
-dfToolmetrics = pd.read_csv("Dataframe/dfToolmetrics.tsv.bz2", sep="\t")
 dfToolTopic = pd.read_csv("Dataframe/dfToolTopic.tsv.bz2", sep="\t")#Tool, topic, topicLabel no transitive
 dfToolTopicTransitive = pd.read_csv("Dataframe/dfToolTopicTransitive.tsv.bz2", sep="\t")#Tool, topic, topicLabel transitive
 dfToolOperation = pd.read_csv("Dataframe/dfToolOperation.tsv.bz2", sep="\t")#tool, operation, operationLabel no transitive
@@ -46,7 +46,6 @@ df_redundancy_topic = pd.read_csv("Dataframe/dfToolTopic_redundancy.tsv.bz2", se
 df_redundancy_operation = pd.read_csv("Dataframe/dfToolOperation_redundancy.tsv.bz2", sep="\t")#Identification of redundancy operation
 df_topic_no_redundancy = pd.read_csv("Dataframe/df_topic_no_redundancy.tsv.bz2", sep="\t")#tool, topic and topicLabel with no redundancy and no transitive
 df_operation_no_redundancy = pd.read_csv("Dataframe/df_operation_no_redundancy.tsv.bz2", sep="\t")#tool, operation, operationLabel with no redundancy and no transitive
-dfToolScore_TF = pd.read_csv("Dataframe/dfToolScore_TF.tsv.bz2", sep="\t")
 dfToolallmetrics_NT = pd.read_csv("Dataframe/dfToolallmetrics_NT.tsv.bz2", sep="\t")
 
 
@@ -55,7 +54,7 @@ dfTopicmetrics = pd.read_csv("Dataframe/dfTopicmetrics.tsv.bz2", sep="\t")#frequ
 dfOperationmetrics = pd.read_csv("Dataframe/dfOperationmetrics.tsv.bz2", sep="\t")#frequence, IC and entroypy of operations unique metric inherited 
 dfOperationmetrics_NT = pd.read_csv("Dataframe/dfOperationmetrics_NT.tsv.bz2", sep="\t")#frequence, IC and entroypy of operations unique metric directly assigned
 dfTopicmetrics_NT = pd.read_csv("Dataframe/dfTopicmetrics_NT.tsv.bz2", sep="\t")#frequence, IC and entroypy of topics unique metric directly assigned
-"""
+
 nbTools = len(dfTool)
 nbToolsWithTopic = dfToolTopic["tool"].nunique()
 nbToolsWithOperation = dfToolOperation["tool"].nunique()
@@ -2140,12 +2139,7 @@ def get_dfToolTopic_NotOWLClass() -> pd.DataFrame:
 
 def get_dfTool_ObsoleteOperation() -> pd.DataFrame:
     """
-    Retrieve tools that are annotated with an obsolete operation.
-
-    Uses global variables:
-      - endpointURL
-      - prefixes
-      - sparqldataframe
+    Retrieve tools that have obsolete operation annotations with suggestions covered by other valid annotations.
 
     Returns
     -------
@@ -2155,16 +2149,29 @@ def get_dfTool_ObsoleteOperation() -> pd.DataFrame:
     """
 
     query = """
-    # tools are annotated by an obsolete operation 
-    SELECT DISTINCT ?tool
-    WHERE {
-      ?tool rdf:type sc:SoftwareApplication .
-      ?tool sc:featureList ?operation .
-      FILTER NOT EXISTS {
-        ?operation rdfs:subClassOf* edam:operation_0004 .
-      }
-    }
-    """
+# tools with an obsolete operation annotation that has suggestions covered by another valid annotation
+# operation: compatible (rdfs:subClassOf* => 108) or more precise (rdfs:subClassOf+ => 70) than a valid operation
+
+SELECT DISTINCT ?tool #?validItem ?alternativeItem
+WHERE {
+  VALUES ?annotationType { sc:featureList } # Operation
+
+  ?tool rdf:type sc:SoftwareApplication .
+  ?tool ?annotationType ?validItem .
+  ?tool ?annotationType ?deprecatedItem .
+  
+  { ?deprecatedItem rdfs:subClassOf owl:DeprecatedClass }
+  UNION
+  { ?deprecatedItem owl:deprecated true . }
+  UNION
+  { ?deprecatedItem owl:deprecated "true" . }
+  UNION 
+  { ?deprecatedItem owl:deprecated "True" . }
+  
+  ?deprecatedItem oboInOwl:consider ?alternativeItem .
+  ?alternativeItem rdfs:subClassOf+ ?validItem .
+}
+"""
 
     # Execute SPARQL and return DataFrame
     dfTool_ObsoleteOperation = sparqldataframe.query(endpointURL, prefixes + query)
@@ -2648,3 +2655,202 @@ def compute_tool_metrics_non_transitive(
     dfToolallmetrics_NT = dfTool
 
     return dfToolallmetrics_NT
+
+
+def get_tool_url(tool_name: str) -> str:
+    if tool_name.startswith("https://bio.tools/"):
+        return tool_name
+    return f"https://bio.tools/{tool_name}"
+
+
+def normalize_tool_input(tools):
+    if isinstance(tools, str):
+        tools = [tools]
+    return [get_tool_url(t) for t in tools]
+
+
+def _resolve_annotation_type(value: str) -> str:
+    """Resolve shorthand to full annotation type."""
+    mapping = {
+        "T": "Topic",
+        "O": "Operation",
+        "Topic": "Topic",
+        "Operation": "Operation"
+    }
+    value = value.capitalize() if len(value) > 1 else value.upper()
+    if value not in mapping:
+        raise ValueError(f"Invalid annotation type: {value}")
+    return mapping[value]
+
+
+# -----------------------------------------
+# FETCH ANNOTATION LOGIC (supports multi-type)
+# -----------------------------------------
+
+def fetch_annotations(tools, annotation_types=("Topic",), transitive=True, with_label=True):
+    tools = normalize_tool_input(tools)
+
+    # Normalize annotation types, remove duplicates
+    resolved_types = [
+        _resolve_annotation_type(a) for a in annotation_types
+    ]
+    resolved_types = list(dict.fromkeys(resolved_types))
+
+    result = {tool: {} for tool in tools}
+
+    # Determine which dataframe to use
+    for ann_type in resolved_types:
+
+        if ann_type == "Topic":
+            df = dfToolTopicTransitive if transitive else dfToolTopic
+            col_uri, col_label = "topic", "topicLabel"
+
+        elif ann_type == "Operation":
+            df = dfToolOperationTransitive if transitive else dfToolOperation
+            col_uri, col_label = "operation", "operationLabel"
+
+        # Collect annotations per tool
+        for tool in tools:
+            filtered = df[df["tool"] == tool]
+
+            if with_label:
+                annotations = [
+                    {"URI": row[col_uri], "label": row[col_label]}
+                    for _, row in filtered.iterrows()
+                ]
+            else:
+                annotations = [
+                    {"URI": row[col_uri]}
+                    for _, row in filtered.iterrows()
+                ]
+
+            result[tool][ann_type] = annotations
+
+    return result
+
+
+# -----------------------------------------
+# OUTPUT: JSON
+# -----------------------------------------
+
+def to_json(annotations: Dict) -> str:
+    return json.dumps({"annotation": annotations}, indent=2)
+
+
+# -----------------------------------------
+# OUTPUT: TURTLE
+# -----------------------------------------
+
+def _format_as_turtle(results: Dict, include_labels: bool = True) -> str:
+
+    ttl = [
+        "@prefix biotools: <https://bio.tools/ontology/> .",
+        "@prefix bsc: <http://bioschemas.org/> .",
+        "@prefix bsct: <http://bioschemas.org/types/> .",
+        "@prefix dcterms: <http://purl.org/dc/terms/> .",
+        "@prefix edam: <http://edamontology.org/> .",
+        "@prefix sc: <http://schema.org/> .",
+        "@prefix schema: <https://schema.org/> .",
+        "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .",
+        "@prefix ex: <http://example.org/> .",
+        "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .",
+        ""
+    ]
+
+    for tool_uri, ann_dict in results.items():
+        tool_id = tool_uri.replace("https://bio.tools/", "")
+        ttl.append(f"ex:Tool_{tool_id} a sc:SoftwareApplication ;")
+        ttl.append(f"    sc:url <{tool_uri}> ;")
+
+        triples = []
+
+        # Topics
+        for ann in ann_dict.get("Topic", []):
+            ann_id = ann["URI"].split(":")[-1]
+            triples.append(f"    sc:applicationSubCategory ex:{ann_id} ;")
+
+        # Operations
+        for ann in ann_dict.get("Operation", []):
+            ann_id = ann["URI"].split(":")[-1]
+            triples.append(f"    sc:featureList ex:{ann_id} ;")
+
+        if triples:
+            ttl.extend(triples)
+            ttl[-1] = ttl[-1].rstrip(" ;") + " ."
+        else:
+            ttl[-1] = ttl[-1].rstrip(" ;") + " ."
+
+        ttl.append("")
+
+        # Annotation class definitions
+        for ann_type, ann_list in ann_dict.items():
+            for ann in ann_list:
+                ann_id = ann["URI"].split(":")[-1]
+                ttl.append(f"ex:{ann_id} a ex:{ann_type} ;")
+                if include_labels and "label" in ann:
+                    ttl.append(f'    rdfs:label "{ann["label"]}" .')
+                else:
+                    ttl[-1] = ttl[-1].rstrip(" ;") + " ."
+                ttl.append("")
+
+    return "\n".join(ttl)
+
+
+# -----------------------------------------
+# OUTPUT: SPARQL
+# -----------------------------------------
+
+def _format_as_sparql(tool_urls: List[str], annotation_types: List[str], transitive: bool) -> str:
+
+    tools_values = " ".join([f"<{url}>" for url in tool_urls])
+    want_topic = any(a.lower() == "topic" for a in annotation_types)
+    want_operation = any(a.lower() == "operation" for a in annotation_types)
+
+    # Construct transitive topic hierarchy query
+    if transitive and want_topic:
+        return f"""PREFIX sc: <http://schema.org/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+CONSTRUCT {{
+    ?tool sc:applicationSubCategory ?superTopic .
+}}
+WHERE {{
+    VALUES ?tool {{ {tools_values} }}
+    ?tool rdf:type sc:SoftwareApplication .
+    ?tool sc:applicationSubCategory ?topic .
+    ?topic rdfs:subClassOf* ?superTopic .
+    ?superTopic rdf:type owl:Class .
+}}"""
+
+    # SELECT variant (non-transitive)
+    query = f"""PREFIX sc: <http://schema.org/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+
+SELECT ?tool ?topic ?topicLabel ?operation ?operationLabel
+WHERE {{
+    VALUES ?tool {{ {tools_values} }}
+    ?tool rdf:type sc:SoftwareApplication .
+"""
+
+    if want_topic:
+        query += """
+    OPTIONAL {
+        ?tool sc:applicationSubCategory ?topic .
+        OPTIONAL { ?topic rdfs:label ?topicLabel . }
+    }
+"""
+
+    if want_operation:
+        query += """
+    OPTIONAL {
+        ?tool sc:featureList ?operation .
+        OPTIONAL { ?operation rdfs:label ?operationLabel . }
+    }
+"""
+
+    query += "}"
+
+    return query
