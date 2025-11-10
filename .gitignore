@@ -4,6 +4,7 @@ __pycache__/
 
 # Fuseki log files 
 run/
+fuseki.log
 
 # Test pictures
 *.svg
