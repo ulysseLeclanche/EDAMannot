@@ -5,6 +5,7 @@ __pycache__/
 # Fuseki log files 
 run/
 fuseki.log
+.fuseki.pid
 fuseki.pid
 
 # Test pictures
