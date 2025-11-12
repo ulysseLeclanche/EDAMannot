@@ -27,17 +27,26 @@ def fuseki():
     """Manage Apache Fuseki server."""
     pass
 
+
 FUSEKI_PID_FILE = ".fuseki.pid"
 FUSEKI_LOG_FILE = "fuseki.log"
+
+
 @fuseki.command("start")
-@click.option("--bioschemas", type=click.Path(exists=True), default=None,
-              help="Custom Bioschemas TTL file.")
-@click.option("--edam", type=click.Path(exists=True), default=None,
-              help="Custom EDAM OWL file.")
+@click.option(
+    "--bioschemas",
+    type=click.Path(exists=True),
+    default=None,
+    help="Custom Bioschemas TTL file.",
+)
+@click.option(
+    "--edam", type=click.Path(exists=True), default=None, help="Custom EDAM OWL file."
+)
 def fuseki_start(bioschemas, edam):
     """Start the Fuseki server."""
     process = launch_fuseki_server(bioschemas, edam)
     click.echo(f"Fuseki server STARTED (PID={process.pid})")
+
 
 @fuseki.command("stop")
 def fuseki_stop():
@@ -59,6 +68,7 @@ def fuseki_stop():
     # cleanup
     if os.path.exists(FUSEKI_PID_FILE):
         os.remove(FUSEKI_PID_FILE)
+
 
 def launch_fuseki_server(bioschemas_file: str = None, edam_file: str = None):
     """
@@ -118,7 +128,6 @@ def launch_fuseki_server(bioschemas_file: str = None, edam_file: str = None):
     time.sleep(5)
 
     return process
-
 
 
 # -----------------------------------------------------
@@ -274,28 +283,97 @@ def initialize(bioschemas_file, edam_file):
     click.echo("\nShut down Fuseki server")
     fuseki.terminate()
 
+@click.command(name="QC")
+@click.argument("tools", nargs=-1)
+@click.option(
+    "--heritage", "-h",
+    is_flag=True,
+    default=False,
+    help="Use heritage (inherited) metrics and annotations (default: False)"
+)
+@click.option(
+    "--metric", "-m",
+    default="all",
+    type=click.Choice(["ic", "entropy", "count", "all"], case_sensitive=False),
+    help="Which metric to fetch: 'ic', 'entropy', 'count', or 'all'"
+)
+@click.option(
+    "--annotations",
+    is_flag=True,
+    default=True,
+    help="Include EDAM annotations in the output (default: True)"
+)
+@click.option(
+    "--no-annotations", "-noa",
+    is_flag=True,
+    default=False,
+    help="Exclude EDAM annotations from the output (alias: -noa)"
+)
+@click.option(
+    "--output_format", "-f",
+    default="json",
+    type=click.Choice(["json", "dict"], case_sensitive=False),
+    help="Output format"
+)
+def qc(tools, heritage, metric, annotations, no_annotations, output_format):
+    """
+    QC: Show selected metrics (IC, entropy, count) with optional EDAM annotations.
+
+    Examples:
+      python CLI.py QC star -m ic -f json
+      python CLI.py QC star -m all -noa
+      python CLI.py QC star --heritage
+    """
+    # If user passed --no-annotations or -noa, override
+    include_annotations = not no_annotations and annotations
+
+    results = edam.fetch_annotations_with_metrics(
+        tools,
+        annotation_types=("Topic", "Operation"),
+        heritage=heritage,
+        with_label=True,
+        metric=metric,
+        include_annotations=include_annotations
+    )
+
+    if output_format.lower() == "json":
+        import json
+        click.echo(json.dumps(results, indent=2))
+    else:
+        click.echo(results)
+
 
 @cli.command(name="describe")
 @click.argument("tools", nargs=-1)
 @click.option(
-    "--annotation", "-a", "--annotation_type",
+    "--annotation",
+    "-a",
+    "--annotation_type",
     multiple=True,
     default=["Topic"],
     type=click.Choice(["Topic", "Operation", "T", "O"], case_sensitive=False),
-    help="Annotation type(s): Topic (T) and/or Operation (O). Can be used multiple times."
+    help="Annotation type(s): Topic (T) and/or Operation (O). Can be used multiple times.",
 )
-@click.option("--transitive", "-t", is_flag=True, default=False,
-              help="Use transitive annotations (default: False)")
 @click.option(
-    "--no-label", "-nL",
+    "--transitive",
+    "-t",
     is_flag=True,
     default=False,
-    help="Exclude labels from output (default: include labels)"
+    help="Use transitive annotations (default: False)",
 )
 @click.option(
-    "--output_format", "-f", default="json",
+    "--no-label",
+    "-nL",
+    is_flag=True,
+    default=False,
+    help="Exclude labels from output (default: include labels)",
+)
+@click.option(
+    "--output_format",
+    "-f",
+    default="json",
     type=click.Choice(["json", "dict", "ttl", "sparql"], case_sensitive=False),
-    help="Output format"
+    help="Output format",
 )
 def describe(tools, annotation, transitive, no_label, output_format):
     """
@@ -304,14 +382,12 @@ def describe(tools, annotation, transitive, no_label, output_format):
     Example:
     python EDAMannot.py describe qiime2 -a T -a O -t -f json
     """
-    # Ensure Fuseki is running
-    launch_fuseki_server()
 
     annotations = edam.fetch_annotations(
         tools,
         annotation_types=annotation,
         transitive=transitive,
-        with_label=not no_label
+        with_label=not no_label,
     )
 
     if output_format.lower() == "json":
@@ -328,32 +404,68 @@ def describe(tools, annotation, transitive, no_label, output_format):
         atypes = [edam._resolve_annotation_type(a) for a in annotation]
         query = edam._format_as_sparql(tool_urls, atypes, transitive)
         click.echo(query)
-        
-@cli.command(name="describe-graph")
-@click.option("-t", "--show-topics", is_flag=True, default=False,
-              help="Include related topics.")
-@click.option("-o", "--show-operations", is_flag=True, default=False,
-              help="Include related operations.")
-@click.option("-h", "--highlight", is_flag=True, default=False,
-              help="Highlight intersection between tools.")
-@click.option("-n", "--show-deprecated", is_flag=True, default=False,
-              help="Include deprecated annotations.")
-@click.option("--title", multiple=True, required=True,
-              help="Tool name(s) (e.g. bwa, qiime2). Can be used multiple times.")
-@click.option("--output_format",
-              type=click.Choice(["SVG", "PNG", "PDF", "CSV"], case_sensitive=False),
-              default="SVG",
-              help="Graph output format.")
-@click.option("-O", "--output", type=click.Path(writable=True),
-              help="Output filename without extension.")
-def describe_graph(show_topics, show_operations, highlight,
-                   show_deprecated, title, output_format, output):
+
+
+@cli.command(name="describe-diagram")
+@click.option(
+    "-t", "--show-topics", is_flag=True, default=False, help="Include related topics."
+)
+@click.option(
+    "-o",
+    "--show-operations",
+    is_flag=True,
+    default=False,
+    help="Include related operations.",
+)
+@click.option(
+    "-h",
+    "--highlight",
+    is_flag=True,
+    default=False,
+    help="Highlight intersection between tools.",
+)
+@click.option(
+    "-n",
+    "--show-deprecated",
+    is_flag=True,
+    default=False,
+    help="Include deprecated annotations.",
+)
+@click.option(
+    "--title",
+    multiple=True,
+    required=True,
+    help="Tool name(s) (e.g. bwa, qiime2). Can be used multiple times.",
+)
+@click.option(
+    "--output_format",
+    type=click.Choice(["SVG", "PNG", "PDF", "CSV"], case_sensitive=False),
+    default="SVG",
+    help="Graph output format.",
+)
+@click.option(
+    "-O",
+    "--output",
+    type=click.Path(writable=True),
+    help="Output filename without extension.",
+)
+def describe_graph(
+    show_topics,
+    show_operations,
+    highlight,
+    show_deprecated,
+    title,
+    output_format,
+    output,
+):
     """
     Describe one or more tools using EDAM annotations and produce a graph or CSV.
 
     Example:
         cli.py describe-graph -t -o -h -n --title bwa --title qiime2 --output_format CSV
     """
+    # Ensure Fuseki is running
+    launch_fuseki_server()
 
     BIOTOOLS_URI = "https://bio.tools/"
     tool_uris = [BIOTOOLS_URI + t for t in title]
@@ -411,6 +523,9 @@ def describe_graph(show_topics, show_operations, highlight,
         f.write(data)
 
     click.echo(f"Graph saved as {filename}")
+
+cli.add_command(qc)
+
 # -----------------------------------------------------
 # MAIN
 # -----------------------------------------------------

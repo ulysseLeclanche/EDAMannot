@@ -2792,7 +2792,12 @@ def _format_as_turtle(results: Dict, include_labels: bool = True) -> str:
                 else:
                     ttl[-1] = ttl[-1].rstrip(" ;") + " ."
                 ttl.append("")
-
+                
+    """
+    test_turtle = "\n".join(ttl)
+    G = rdflib.Graph()
+    G.parse(data = test_turtle, format = "turtle")
+    """
     return "\n".join(ttl)
 
 
@@ -2854,3 +2859,147 @@ WHERE {{
     query += "}"
 
     return query
+
+
+DF_TOOL_NO_TRANS = pd.read_csv("Dataframe/dfTool_NoTransitive.tsv.bz2", sep="\t", compression='bz2')
+DF_TOOL_TOPICS_OPS = pd.read_csv("Dataframe/dftools_nbTopics_nbOperations.tsv.bz2", sep="\t", compression='bz2')
+
+def get_tool_metrics(tool: str, heritage: bool = True, metric: str = "all") -> dict:
+    """
+    Fetch metrics for a given tool with selectable type: 'ic', 'entropy', 'count', or 'all'.
+
+    Parameters
+    ----------
+    tool : str
+        Tool name or bio.tools URI.
+    heritage : bool
+        Whether to use inherited (transitive) metrics (default: True).
+    metric : str
+        Metric type to return ('ic', 'entropy', 'count', or 'all').
+
+    Returns
+    -------
+    dict
+        A dictionary with the tool’s metrics.
+    """
+    tool_url = tool if tool.startswith("https://bio.tools/") else f"https://bio.tools/{tool}"
+    
+    # Choose the appropriate dataframes based on heritage mode
+    df_metrics = dfToolallmetrics if heritage else dfToolallmetrics_NT
+    df_counts = DF_TOOL_TOPICS_OPS if heritage else DF_TOOL_NO_TRANS
+
+    row_metrics = df_metrics[df_metrics['tool'] == tool_url]
+    row_counts = df_counts[df_counts['tool'] == tool_url]
+
+    if row_metrics.empty and row_counts.empty:
+        raise ValueError(f"Tool not found: {tool_url}")
+
+    metrics = row_metrics.iloc[0] if not row_metrics.empty else {}
+    counts = row_counts.iloc[0] if not row_counts.empty else {}
+
+    result = {"Tool": tool_url}
+
+    # IC (Information Content)
+    if metric in ("ic", "all"):
+        result["topicScore"] = float(metrics.get("topicScore", 0))
+        result["operationScore"] = float(metrics.get("operationScore", 0))
+    
+    # Entropy
+    if metric in ("entropy", "all"):
+        result["entropy"] = float(metrics.get("entropy", 0))
+
+    # Count of annotations
+    if metric in ("count", "all"):
+        result["nbTopics"] = int(counts.get("nbTopics", 0))
+        result["nbOperations"] = int(counts.get("nbOperations", 0))
+
+    return result
+
+
+def format_tool_annotations(metrics: dict) -> dict:
+    """
+    Format the tool metrics into the EDAM annotation dict structure.
+    """
+    return {
+        "annotation": {
+            "Metrics": metrics
+        }
+    }
+
+
+def fetch_annotations_with_metrics(
+    tools,
+    annotation_types=("Topic", "Operation"),
+    heritage=True,
+    with_label=True,
+    metric="all",
+    include_annotations=True
+):
+    """
+    Fetch EDAM annotations and/or tool metrics together in one structured dict.
+
+    Parameters
+    ----------
+    tools : list[str] or str
+        Tool name(s) or URLs.
+    annotation_types : tuple[str]
+        Annotation types to include ('Topic', 'Operation', etc.).
+    heritage : bool
+        Whether to use inherited (transitive) annotations (default: True).
+    with_label : bool
+        Whether to include labels in annotations.
+    metric : str
+        Metric type to include ('ic', 'entropy', 'count', 'all').
+    include_annotations : bool
+        Whether to include EDAM annotations (default: True).
+
+    Returns
+    -------
+    dict
+        { "https://bio.tools/<tool>" : {
+            "annotation": {
+              "Topic": [...],
+              "Operation": [...],
+              "Data": [],
+              "Format": [],
+              "Metrics": {...}
+            }
+        }}
+    """
+    tools = normalize_tool_input(tools)
+    combined = {}
+
+    # Fetch annotations only if requested
+    annotation_data = {}
+    if include_annotations:
+        annotation_data = fetch_annotations(
+            tools,
+            annotation_types=annotation_types,
+            transitive=heritage,  # kept for backward compat inside fetch_annotations()
+            with_label=with_label
+        )
+
+    # Merge metrics and annotations per tool
+    for tool in tools:
+        try:
+            metrics = get_tool_metrics(tool, heritage=heritage, metric=metric)
+        except ValueError:
+            metrics = {}
+
+        # Safely populate annotation categories
+        topic_anns = annotation_data.get(tool, {}).get("Topic", []) if include_annotations else []
+        op_anns = annotation_data.get(tool, {}).get("Operation", []) if include_annotations else []
+        data_anns = annotation_data.get(tool, {}).get("Data", []) if include_annotations else []
+        format_anns = annotation_data.get(tool, {}).get("Format", []) if include_annotations else []
+
+        combined[tool] = {
+            "annotation": {
+                "Topic": topic_anns,
+                "Operation": op_anns,
+                "Data": data_anns,
+                "Format": format_anns,
+                "Metrics": metrics
+            }
+        }
+
+    return combined
