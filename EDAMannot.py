@@ -61,7 +61,7 @@ nbToolsWithOperation = dfToolOperation["tool"].nunique()
 
 
 # Configuration SPARQL end point
-endpointURL = "http://localhost:3030/biotoolsEdam/query"
+endpointURL = "http://localhost:3030/sharefair/query"
 rdfFormat = "turtle"
 
 # Import prefix :
@@ -1571,6 +1571,7 @@ def get_nb_tools() -> int:
     SELECT (COUNT(DISTINCT ?tool) AS ?nbTools)
     WHERE {
       ?tool rdf:type sc:SoftwareApplication .
+      FILTER(STRSTARTS(STR(?tool), "https://bio.tools/"))
     }
     """
 
@@ -1597,6 +1598,7 @@ def get_tools_dataframe() -> pd.DataFrame:
     WHERE {
       ?tool rdf:type sc:SoftwareApplication .
       ?tool sc:name ?toolLabel .
+      FILTER(STRSTARTS(STR(?tool), "https://bio.tools/"))
     }
     """
 
@@ -1620,6 +1622,7 @@ def get_tools_topics_dataframe() -> pd.DataFrame:
       ?tool rdf:type sc:SoftwareApplication .
       ?tool sc:applicationSubCategory ?topic .
       ?topic rdf:type owl:Class .
+      FILTER(STRSTARTS(STR(?tool), "https://bio.tools/"))
       FILTER NOT EXISTS { ?topic rdfs:subClassOf? owl:DeprecatedClass }
       OPTIONAL { ?topic rdfs:label ?tLabel }
       BIND(COALESCE(?tLabel, "") AS ?topicLabel)
@@ -1646,6 +1649,7 @@ def get_tools_topics_transitive_dataframe() -> pd.DataFrame:
       ?tool rdf:type sc:SoftwareApplication .
       ?tool sc:applicationSubCategory/(rdfs:subClassOf*) ?topic .
       ?topic rdf:type owl:Class .
+      FILTER(STRSTARTS(STR(?tool), "https://bio.tools/"))
       FILTER NOT EXISTS { ?topic rdfs:subClassOf? owl:DeprecatedClass }
       OPTIONAL { ?topic rdfs:label ?tLabel }
       BIND(COALESCE(?tLabel, "") AS ?topicLabel)
@@ -1674,6 +1678,7 @@ def get_tools_operations_label_dataframe() -> pd.DataFrame:
       ?tool rdf:type sc:SoftwareApplication .
       ?tool sc:featureList ?operation .
       ?operation rdf:type owl:Class .
+      FILTER(STRSTARTS(STR(?tool), "https://bio.tools/"))
       FILTER NOT EXISTS { ?operation rdfs:subClassOf? owl:DeprecatedClass }
       OPTIONAL { ?operation rdfs:label ?oLabel }
       BIND(COALESCE(?oLabel, "") AS ?operationLabel)
@@ -1700,6 +1705,7 @@ def get_tools_operations_transitive_dataframe() -> pd.DataFrame:
       ?tool rdf:type sc:SoftwareApplication .
       ?tool sc:featureList/(rdfs:subClassOf*) ?operation .
       ?operation rdf:type owl:Class .
+      FILTER(STRSTARTS(STR(?tool), "https://bio.tools/"))
       FILTER NOT EXISTS { ?operation rdfs:subClassOf? owl:DeprecatedClass }
       OPTIONAL { ?operation rdfs:label ?oLabel }
       BIND(COALESCE(?oLabel, "") AS ?operationLabel)
@@ -2117,6 +2123,7 @@ def get_dfToolTopic_NotOWLClass() -> pd.DataFrame:
     WHERE {
       ?tool rdf:type sc:SoftwareApplication .
       ?tool sc:applicationSubCategory/(rdfs:subClassOf*) ?topic .
+      FILTER(STRSTARTS(STR(?tool), "https://bio.tools/"))
       FILTER NOT EXISTS {
         ?topic rdf:type owl:Class .
       }
@@ -2159,6 +2166,7 @@ WHERE {
   ?tool rdf:type sc:SoftwareApplication .
   ?tool ?annotationType ?validItem .
   ?tool ?annotationType ?deprecatedItem .
+  FILTER(STRSTARTS(STR(?tool), "https://bio.tools/"))
   
   { ?deprecatedItem rdfs:subClassOf owl:DeprecatedClass }
   UNION
