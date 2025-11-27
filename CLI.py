@@ -22,7 +22,7 @@ def cli():
 # -----------------------------------------------------
 # Fuseki launcher
 # -----------------------------------------------------
-@cli.group()
+@cli.group(hidden=True)
 def fuseki():
     """Manage Apache Fuseki server."""
     pass
@@ -406,7 +406,7 @@ def describe(tools, annotation, transitive, no_label, output_format):
         click.echo(query)
 
 
-@cli.command(name="describe-diagram")
+@cli.command(name="describe-viz")
 @click.option(
     "-t", "--show-topics", is_flag=True, default=False, help="Include related topics."
 )
