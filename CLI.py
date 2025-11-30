@@ -1,9 +1,5 @@
 import os
-import time
 import click
-import subprocess
-import time
-import signal
 
 # Import your dataframe-generating functions
 import EDAMannot as edam
@@ -15,120 +11,11 @@ import EDAMannot as edam
 
 @click.group()
 def cli():
-    """EDAM Annot CLI."""
-    pass
-
-
-# -----------------------------------------------------
-# Fuseki launcher
-# -----------------------------------------------------
-@cli.group(hidden=True)
-def fuseki():
-    """Manage Apache Fuseki server."""
-    pass
-
-
-FUSEKI_PID_FILE = ".fuseki.pid"
-FUSEKI_LOG_FILE = "fuseki.log"
-
-
-@fuseki.command("start")
-@click.option(
-    "--bioschemas",
-    type=click.Path(exists=True),
-    default=None,
-    help="Custom Bioschemas TTL file.",
-)
-@click.option(
-    "--edam", type=click.Path(exists=True), default=None, help="Custom EDAM OWL file."
-)
-def fuseki_start(bioschemas, edam):
-    """Start the Fuseki server."""
-    process = launch_fuseki_server(bioschemas, edam)
-    click.echo(f"Fuseki server STARTED (PID={process.pid})")
-
-
-@fuseki.command("stop")
-def fuseki_stop():
-    """Stop Fuseki server."""
-    if not os.path.exists(FUSEKI_PID_FILE):
-        click.echo("Fuseki is not running.")
-        return
-
-    with open(FUSEKI_PID_FILE) as f:
-        pid = int(f.read().strip())
-
-    try:
-        os.kill(pid, signal.SIGTERM)
-        time.sleep(1)
-        click.echo(f"Fuseki server STOPPED (PID={pid})")
-    except Exception:
-        click.echo("Failed to terminate Fuseki (maybe already dead).")
-
-    # cleanup
-    if os.path.exists(FUSEKI_PID_FILE):
-        os.remove(FUSEKI_PID_FILE)
-
-
-def launch_fuseki_server(bioschemas_file: str = None, edam_file: str = None):
     """
-    Launch Fuseki server with default or user-provided files.
-    Writes PID to .fuseki.pid
-    Redirects output to fuseki.log
+    EDAMannot is a command-line toolbox using ShareFAIR-KG. 
+    The toolbox offersprocessing, metrics and visualisation features leveraging the EDAM hierarchy.
     """
-
-    # 1. If already running → reuse
-    if os.path.exists(FUSEKI_PID_FILE):
-        with open(FUSEKI_PID_FILE) as f:
-            pid = int(f.read().strip())
-        try:
-            os.kill(pid, 0)  # check process exists
-            click.echo(f"Fuseki already running (PID={pid})")
-            return subprocess.Popen([], pid=pid)  # dummy object
-        except Exception:
-            pass  # stale pid → start new one
-
-    # 2. Defaults
-    default_bioschemas = "edam/bioschemas-dump_05_01_2025.ttl"
-    default_edam = "edam/EDAM_1.25.owl"
-
-    bioschemas_file = bioschemas_file or default_bioschemas
-    edam_file = edam_file or default_edam
-
-    bioschemas_file = os.path.abspath(bioschemas_file)
-    edam_file = os.path.abspath(edam_file)
-
-    click.echo(f"Using Bioschemas : {bioschemas_file}")
-    click.echo(f"Using EDAM       : {edam_file}")
-
-    # 3. FUSEKI_HOME check
-    fuseki_home = os.environ.get("FUSEKI_HOME")
-    if not fuseki_home:
-        raise click.ClickException("FUSEKI_HOME is not set.")
-
-    fuseki_cmd = [
-        f"{fuseki_home}/fuseki-server",
-        f"--file={bioschemas_file}",
-        f"--file={edam_file}",
-        "/biotoolsEdam",
-    ]
-
-    click.echo("\nLaunching Fuseki → fuseki.log")
-    click.echo(" ".join(fuseki_cmd))
-
-    log_file = open(FUSEKI_LOG_FILE, "w")
-
-    process = subprocess.Popen(fuseki_cmd, stdout=log_file, stderr=log_file)
-
-    # Write PID
-    with open(FUSEKI_PID_FILE, "w") as pidf:
-        pidf.write(str(process.pid))
-
-    # Give Fuseki time to boot
-    time.sleep(5)
-
-    return process
-
+    pass
 
 # -----------------------------------------------------
 # INIT COMMAND
@@ -136,25 +23,25 @@ def launch_fuseki_server(bioschemas_file: str = None, edam_file: str = None):
 
 
 @cli.command(name="init")
-#@click.option("--bioschemas-file", "-b", help="Path to Bioschemas .ttl file")
-#@click.option("--edam-file", "-e", help="Path to EDAM .owl file")
 def initialize():
     """
-    Initialize Fuseki server and generate all EDAMannot dataframes.
+    Compute all tables containing metrics and annotation information for the tools available in bio.tools.
+    
+    These dataframes are necessary for the toolkit to function. 
+    
+    Command usage : python3 CLI.py init
     """
     click.echo("=== EDAMannot Initialization ===")
 
     # ------------------------------------------------------------
     # STEP 1 — Launch Fuseki server
     # ------------------------------------------------------------
-    #fuseki = launch_fuseki_server(bioschemas_file=bioschemas_file, edam_file=edam_file)
 
     click.echo("\n=== Query bioschemas-file, generate and calculate dataframes ===")
     os.makedirs("Dataframe", exist_ok=True)
 
     generated_files = []
 
-#try:
     # ------------------------------------------------------------
     # PRIMARY EXTRACTIONS — base objects
     # ------------------------------------------------------------
@@ -274,14 +161,6 @@ def initialize():
     for f in generated_files:
         click.echo(f"  - {f}")
 
-    #except Exception as e:
-        #click.echo("\n ERROR while generating dataframes!", err=True)
-        #click.echo(str(e))
-        #fuseki.terminate()
-        #raise click.Abort()
-
-    #click.echo("\nShut down Fuseki server")
-    #fuseki.terminate()
 
 @click.command(name="QC")
 @click.argument("tools", nargs=-1)
@@ -317,13 +196,27 @@ def initialize():
 )
 def qc(tools, heritage, metric, annotations, no_annotations, output_format):
     """
-    QC: Show selected metrics (IC, entropy, count) with optional EDAM annotations.
+    Show selected metrics (topicScore, operationScore, score, entropy, count) with optional EDAM annotations.
 
-    Examples:
-      python CLI.py QC star -m ic -f json
-      python CLI.py QC star -m all -noa
-      python CLI.py QC star --heritage
+    Examples of command usage :
+
+    python3 CLI.py QC https://bio.tools/star --heritage --metric all --output_format json
+    
+    or using alias options :
+    
+    python3 CLI.py QC star -h -m all -f json
+
+    To exclude annotations from the output, see only direct annotations metrics and see selected metrics only :
+    python3 CLI.py QC star -m ic -noa
+
+    - topicScore: Score based on the IC (Information Content) of topics associated with a tool.
+    - operationScore: Score based on the IC of operations associated with a tool.
+    - score: Sum of the two previous scores.
+    - topicEntropy: Total entropy of topics associated with a tool.
+    - operationEntropy: Total entropy of operations associated with a tool.
+    - entropy: Sum of the previous entropies.
     """
+
     # If user passed --no-annotations or -noa, override
     include_annotations = not no_annotations and annotations
 
@@ -355,11 +248,11 @@ def qc(tools, heritage, metric, annotations, no_annotations, output_format):
     help="Annotation type(s): Topic (T) and/or Operation (O). Can be used multiple times.",
 )
 @click.option(
-    "--transitive",
-    "-t",
+    "--heritage",
+    "-h",
     is_flag=True,
     default=False,
-    help="Use transitive annotations (default: False)",
+    help="Use heritage (inherited) annotations (default: False)",
 )
 @click.option(
     "--no-label",
@@ -372,21 +265,26 @@ def qc(tools, heritage, metric, annotations, no_annotations, output_format):
     "--output_format",
     "-f",
     default="json",
-    type=click.Choice(["json", "dict", "ttl", "sparql"], case_sensitive=False),
+    type=click.Choice(["json", "dict"], case_sensitive=False),
     help="Output format",
 )
-def describe(tools, annotation, transitive, no_label, output_format):
+def describe(tools, annotation, heritage, no_label, output_format):
     """
-    Describe tools with EDAM annotations.
+    Describe tools with EDAM annotations can use heritage annotations.
 
-    Example:
-    python EDAMannot.py describe qiime2 -a T -a O -t -f json
+    Example command usage :
+    
+    python3 CLI.py describe https://bio.tools/qiime2 --annotation_type Topic --annotation_type Operation --heritage --output_format json
+   
+    or using alias options :
+    
+    python3 CLI.py describe qiime2 -a T -a O -h -f json
     """
 
     annotations = edam.fetch_annotations(
         tools,
         annotation_types=annotation,
-        transitive=transitive,
+        heritage=heritage,
         with_label=not no_label,
     )
 
@@ -395,15 +293,6 @@ def describe(tools, annotation, transitive, no_label, output_format):
 
     elif output_format.lower() == "dict":
         click.echo(annotations)
-
-    elif output_format.lower() == "ttl":
-        click.echo(edam._format_as_turtle(annotations, include_labels=not no_label))
-
-    elif output_format.lower() == "sparql":
-        tool_urls = edam.normalize_tool_input(tools)
-        atypes = [edam._resolve_annotation_type(a) for a in annotation]
-        query = edam._format_as_sparql(tool_urls, atypes, transitive)
-        click.echo(query)
 
 
 @cli.command(name="describe-viz")
@@ -425,7 +314,7 @@ def describe(tools, annotation, transitive, no_label, output_format):
     help="Highlight intersection between tools.",
 )
 @click.option(
-    "-n",
+    "-d",
     "--show-deprecated",
     is_flag=True,
     default=False,
@@ -437,8 +326,9 @@ def describe(tools, annotation, transitive, no_label, output_format):
     required=True,
     help="Tool name(s) (e.g. bwa, qiime2). Can be used multiple times.",
 )
-@click.option(
+@click.option(    
     "--output_format",
+    "-f",
     type=click.Choice(["SVG", "PNG", "PDF", "CSV"], case_sensitive=False),
     default="SVG",
     help="Graph output format.",
@@ -459,13 +349,17 @@ def describe_graph(
     output,
 ):
     """
-    Describe one or more tools using EDAM annotations and produce a graph or CSV.
-
-    Example:
-        cli.py describe-graph -t -o -h -n --title bwa --title qiime2 --output_format CSV
+   Generate a graph to describe one or more tools using direct and legacy EDAM annotations.
+   You can color the annotations according to metrics (Count, IC, entropy). 
+   
+    Example command usage :
+    
+    python3 CLI.py describe-viz --show-topics --show-operations --highlight --show-deprecated --title bwa --title qiime2 --output_format SVG --output bwa_qiime2_common_graph
+    
+    or using alias options :
+    
+    python3 CLI.py describe-viz -o -h -d --title bwa --title qiime2 -f SVG -O bwa_qiime2_common_graph
     """
-    # Ensure Fuseki is running
-    #launch_fuseki_server()
 
     BIOTOOLS_URI = "https://bio.tools/"
     tool_uris = [BIOTOOLS_URI + t for t in title]
