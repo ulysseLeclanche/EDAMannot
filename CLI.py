@@ -1,5 +1,4 @@
 import os
-from turtle import color
 import click
 import json
 
@@ -395,7 +394,7 @@ def describe_graph(
 
      or using alias options :
 
-     python3 CLI.py describe-viz -o -h -d --title bwa --title qiime2 --cby count --cc red -f SVG -O bwa_qiime2_common_graph
+     python3 CLI.py describe-viz -o -h -d --title bwa --title qiime2 -cby count -cc red -f SVG -O bwa_qiime2_common_graph
     """
 
     BIOTOOLS_URI = "https://bio.tools/"

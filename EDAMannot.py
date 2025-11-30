@@ -2856,7 +2856,7 @@ def get_tool_metrics(tool: str, heritage: bool = True, metric: str = "all") -> d
     tool : str
         Tool name or bio.tools URI.
     heritage : bool
-        Whether to use inherited (transitive) metrics (default: True).
+        Whether to use inherited (heritage) metrics (default: True).
     metric : str
         Metric type to return ('ic', 'entropy', 'count', or 'all').
 
@@ -2959,7 +2959,7 @@ def fetch_annotations_with_metrics(
         annotation_data = fetch_annotations(
             tools,
             annotation_types=annotation_types,
-            transitive=heritage,  # kept for backward compat inside fetch_annotations()
+            heritage=heritage,  # kept for backward compat inside fetch_annotations()
             with_label=with_label,
         )
 
