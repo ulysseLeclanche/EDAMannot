@@ -2695,7 +2695,7 @@ def _resolve_annotation_type(value: str) -> str:
 # FETCH ANNOTATION LOGIC (supports multi-type)
 # -----------------------------------------
 
-def fetch_annotations(tools, annotation_types=("Topic",), transitive=True, with_label=True):
+def fetch_annotations(tools, annotation_types=("Topic",), heritage=True, with_label=True):
     tools = normalize_tool_input(tools)
 
     # Normalize annotation types, remove duplicates
@@ -2710,11 +2710,11 @@ def fetch_annotations(tools, annotation_types=("Topic",), transitive=True, with_
     for ann_type in resolved_types:
 
         if ann_type == "Topic":
-            df = dfToolTopicTransitive if transitive else dfToolTopic
+            df = dfToolTopicTransitive if heritage else dfToolTopic
             col_uri, col_label = "topic", "topicLabel"
 
         elif ann_type == "Operation":
-            df = dfToolOperationTransitive if transitive else dfToolOperation
+            df = dfToolOperationTransitive if heritage else dfToolOperation
             col_uri, col_label = "operation", "operationLabel"
 
         # Collect annotations per tool
