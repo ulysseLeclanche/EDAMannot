@@ -1,22 +1,12 @@
 import os
-import pyarrow
 import pandas as pd
-from rdflib import Dataset
-import collections
-from graphviz import Digraph
 import IPython
 import json
-import matplotlib.pyplot as plt
-import networkx as nx
 import numpy as np
 import pygraphviz as pgv
-import rdflib
-import rdflib.namespace
-import scipy.stats as stats
 import sparqldataframe
 from SPARQLWrapper import SPARQLWrapper, JSON
-import time
-from typing import Union, List, Dict, Optional, Literal, Tuple
+from typing import Dict
 
 
 # === Global variables ===
@@ -37,23 +27,48 @@ dfToolOperation = pd.read_csv(
 )  # tool, operation, operationLabel no transitive
 
 
-dfToolallmetrics = pd.read_csv("Dataframe/dfToolallmetrics.tsv.bz2", sep="\t")#All tool metrics on transitive Topic and Operation
-dfToolTopic = pd.read_csv("Dataframe/dfToolTopic.tsv.bz2", sep="\t")#Tool, topic, topicLabel no transitive
-dfToolTopicTransitive = pd.read_csv("Dataframe/dfToolTopicTransitive.tsv.bz2", sep="\t")#Tool, topic, topicLabel transitive
-dfToolOperation = pd.read_csv("Dataframe/dfToolOperation.tsv.bz2", sep="\t")#tool, operation, operationLabel no transitive
-dfToolOperationTransitive = pd.read_csv("Dataframe/dfToolOperationTransitive.tsv.bz2", sep="\t")# tool, operation, operationLabel transitive
-df_redundancy_topic = pd.read_csv("Dataframe/dfToolTopic_redundancy.tsv.bz2", sep="\t")#Identification of redundancy topic
-df_redundancy_operation = pd.read_csv("Dataframe/dfToolOperation_redundancy.tsv.bz2", sep="\t")#Identification of redundancy operation
-df_topic_no_redundancy = pd.read_csv("Dataframe/df_topic_no_redundancy.tsv.bz2", sep="\t")#tool, topic and topicLabel with no redundancy and no transitive
-df_operation_no_redundancy = pd.read_csv("Dataframe/df_operation_no_redundancy.tsv.bz2", sep="\t")#tool, operation, operationLabel with no redundancy and no transitive
+dfToolallmetrics = pd.read_csv(
+    "Dataframe/dfToolallmetrics.tsv.bz2", sep="\t"
+)  # All tool metrics on transitive Topic and Operation
+dfToolTopic = pd.read_csv(
+    "Dataframe/dfToolTopic.tsv.bz2", sep="\t"
+)  # Tool, topic, topicLabel no transitive
+dfToolTopicTransitive = pd.read_csv(
+    "Dataframe/dfToolTopicTransitive.tsv.bz2", sep="\t"
+)  # Tool, topic, topicLabel transitive
+dfToolOperation = pd.read_csv(
+    "Dataframe/dfToolOperation.tsv.bz2", sep="\t"
+)  # tool, operation, operationLabel no transitive
+dfToolOperationTransitive = pd.read_csv(
+    "Dataframe/dfToolOperationTransitive.tsv.bz2", sep="\t"
+)  # tool, operation, operationLabel transitive
+df_redundancy_topic = pd.read_csv(
+    "Dataframe/dfToolTopic_redundancy.tsv.bz2", sep="\t"
+)  # Identification of redundancy topic
+df_redundancy_operation = pd.read_csv(
+    "Dataframe/dfToolOperation_redundancy.tsv.bz2", sep="\t"
+)  # Identification of redundancy operation
+df_topic_no_redundancy = pd.read_csv(
+    "Dataframe/df_topic_no_redundancy.tsv.bz2", sep="\t"
+)  # tool, topic and topicLabel with no redundancy and no transitive
+df_operation_no_redundancy = pd.read_csv(
+    "Dataframe/df_operation_no_redundancy.tsv.bz2", sep="\t"
+)  # tool, operation, operationLabel with no redundancy and no transitive
 dfToolallmetrics_NT = pd.read_csv("Dataframe/dfToolallmetrics_NT.tsv.bz2", sep="\t")
 
 
-
-dfTopicmetrics = pd.read_csv("Dataframe/dfTopicmetrics.tsv.bz2", sep="\t")#frequence, IC and entroypy of topics unique metric inherited  
-dfOperationmetrics = pd.read_csv("Dataframe/dfOperationmetrics.tsv.bz2", sep="\t")#frequence, IC and entroypy of operations unique metric inherited 
-dfOperationmetrics_NT = pd.read_csv("Dataframe/dfOperationmetrics_NT.tsv.bz2", sep="\t")#frequence, IC and entroypy of operations unique metric directly assigned
-dfTopicmetrics_NT = pd.read_csv("Dataframe/dfTopicmetrics_NT.tsv.bz2", sep="\t")#frequence, IC and entroypy of topics unique metric directly assigned
+dfTopicmetrics = pd.read_csv(
+    "Dataframe/dfTopicmetrics.tsv.bz2", sep="\t"
+)  # frequence, IC and entroypy of topics unique metric inherited
+dfOperationmetrics = pd.read_csv(
+    "Dataframe/dfOperationmetrics.tsv.bz2", sep="\t"
+)  # frequence, IC and entroypy of operations unique metric inherited
+dfOperationmetrics_NT = pd.read_csv(
+    "Dataframe/dfOperationmetrics_NT.tsv.bz2", sep="\t"
+)  # frequence, IC and entroypy of operations unique metric directly assigned
+dfTopicmetrics_NT = pd.read_csv(
+    "Dataframe/dfTopicmetrics_NT.tsv.bz2", sep="\t"
+)  # frequence, IC and entroypy of topics unique metric directly assigned
 
 nbTools = len(dfTool)
 nbToolsWithTopic = dfToolTopic["tool"].nunique()
@@ -1407,6 +1422,48 @@ def getScoreColorRGB(scoreValue, scoreMaxValue, color="red"):
     return "#{:02x}{:02x}{:02x}".format(r, g, b)
 
 
+def dictTopic(dfTopicmetrics, metric_col, edamURI=edamURI):
+    """
+    Extract a dictionary for a given metric from dfTopicmetrics.
+    Returns only the dict (no max needed).
+    """
+
+    raw_dict = (
+        dfTopicmetrics[["topic", metric_col]].set_index("topic").to_dict()[metric_col]
+    )
+
+    dict_clean = {topic.replace(edamURI, ""): val for topic, val in raw_dict.items()}
+
+    return dict_clean
+
+
+def dictOperation(dfOperationmetrics, metric_col, edamURI=edamURI):
+    """
+    Extract a dictionary for a given operation metric from dfOperationmetrics.
+    Returns only the dict (no max).
+    """
+
+    raw_dict = (
+        dfOperationmetrics[["operation", metric_col]]
+        .set_index("operation")
+        .to_dict()[metric_col]
+    )
+
+    dict_clean = {op.replace(edamURI, ""): val for op, val in raw_dict.items()}
+
+    return dict_clean
+
+
+def buildTopicOperationDicts(metric_col):
+    """
+    Build the pair (dictTopicScore, dictOperationScore)
+    corresponding to a given metric column.
+    """
+    dictTopicScore = dictTopic(dfTopicmetrics, metric_col)
+    dictOperationScore = dictOperation(dfOperationmetrics, metric_col)
+    return dictTopicScore, dictOperationScore
+
+
 def colorGraphNodesAccordingToScore(
     graph, dictTopicScore, dictOperationScore, color="red"
 ):
@@ -2101,98 +2158,136 @@ def generate_dfTool_no_transitive_no_redundancy(
     return dfTool_NR
 
 
-def get_dfToolTopic_NotOWLClass() -> pd.DataFrame:
+def get_dfDeprecatedItems(
+    output_path: str = "Dataframe/dfDeprecatedItems.tsv.bz2",
+) -> pd.DataFrame:
     """
-    Retrieve tools whose assigned topic is NOT an owl:Class.
-
-    Uses global variables:
-      - endpointURL
-      - prefixes
-      - sparqldataframe
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame named dfToolTopic_NotOWLClass containing:
-        ['tool', 'topic']
+    Retrieve all items marked as owl:deprecated and save as compressed TSV.
     """
-
     query = """
-    # tools with topic that is not an owl class
-    SELECT DISTINCT ?tool ?topic
+    SELECT DISTINCT ?deprecatedItem
+    WHERE {
+      ?deprecatedItem owl:deprecated true .
+    }
+    ORDER BY ?deprecatedItem
+    """
+
+    sparql = SPARQLWrapper(endpointURL)
+    sparql.setQuery(prefixes + query)
+    sparql.setReturnFormat(JSON)
+    results = sparql.query().convert()
+
+    data = [
+        {"Deprecated Item": r["deprecatedItem"]["value"]}
+        for r in results["results"]["bindings"]
+    ]
+    dfDeprecatedItems = pd.DataFrame(data)
+
+    dfDeprecatedItems.to_csv(output_path, sep="\t", index=False, compression="bz2")
+    return dfDeprecatedItems
+
+
+def get_dfDeprecatedSuggestedItems(
+    output_path: str = "Dataframe/dfDeprecatedSuggestedItems.tsv.bz2",
+) -> pd.DataFrame:
+    """
+    Retrieve deprecated items along with their suggested replacements.
+    """
+    query = """
+    SELECT DISTINCT ?deprecatedItem ?suggestedItem
+    WHERE {
+      {
+        ?deprecatedItem rdfs:subClassOf owl:DeprecatedClass .
+      } UNION {
+        ?deprecatedItem owl:deprecated true .
+      } UNION {
+        ?deprecatedItem owl:deprecated "true" .
+      } UNION {
+        ?deprecatedItem owl:deprecated "True" .
+      }
+      ?deprecatedItem oboInOwl:consider ?suggestedItem .
+    }
+    ORDER BY ?deprecatedItem
+    """
+
+    sparql = SPARQLWrapper(endpointURL)
+    sparql.setQuery(prefixes + query)
+    sparql.setReturnFormat(JSON)
+    results = sparql.query().convert()
+
+    data = [
+        {
+            "Deprecated Item": r["deprecatedItem"]["value"],
+            "Suggested Item": r["suggestedItem"]["value"],
+        }
+        for r in results["results"]["bindings"]
+    ]
+    dfDeprecatedSuggestedItems = pd.DataFrame(data)
+
+    dfDeprecatedSuggestedItems.to_csv(
+        output_path, sep="\t", index=False, compression="bz2"
+    )
+    return dfDeprecatedSuggestedItems
+
+
+def get_dfToolsWithSomeDeprecatedTopic(
+    output_path: str = "Dataframe/dfToolsWithSomeDeprecatedTopic.tsv.bz2",
+) -> pd.DataFrame:
+    """
+    Retrieve the list of tools annotated with at least one deprecated topic.
+    """
+    query = """
+    SELECT DISTINCT ?tool
     WHERE {
       ?tool rdf:type sc:SoftwareApplication .
-      ?tool sc:applicationSubCategory/(rdfs:subClassOf*) ?topic .
-      FILTER(STRSTARTS(STR(?tool), "https://bio.tools/"))
-      FILTER NOT EXISTS {
-        ?topic rdf:type owl:Class .
-      }
+      ?tool sc:applicationSubCategory/(rdfs:subClassOf*) ?deprecatedTopic .
+      ?deprecatedTopic owl:deprecated True .
     }
+    ORDER BY ?tool
     """
 
-    # Execute SPARQL and produce DataFrame
-    dfToolTopic_NotOWLClass = sparqldataframe.query(endpointURL, prefixes + query)
+    sparql = SPARQLWrapper(endpointURL)
+    sparql.setQuery(prefixes + query)
+    sparql.setReturnFormat(JSON)
+    results = sparql.query().convert()
 
-    # Save to compressed TSV file
-    dfToolTopic_NotOWLClass.to_csv(
-        "Dataframe/dfToolTopic_NotOWLClass.tsv.bz2",
-        sep="\t",
-        index=False,
-        compression="bz2",
+    data = [{"Tool": r["tool"]["value"]} for r in results["results"]["bindings"]]
+    dfToolsWithSomeDeprecatedTopic = pd.DataFrame(data)
+
+    dfToolsWithSomeDeprecatedTopic.to_csv(
+        output_path, sep="\t", index=False, compression="bz2"
     )
+    return dfToolsWithSomeDeprecatedTopic
 
-    return dfToolTopic_NotOWLClass
 
-
-def get_dfTool_ObsoleteOperation() -> pd.DataFrame:
+def get_dfToolsWithSomeDeprecatedOperation(
+    output_path: str = "Dataframe/dfToolsWithSomeDeprecatedOperation.tsv.bz2",
+) -> pd.DataFrame:
     """
-    Retrieve tools that have obsolete operation annotations with suggestions covered by other valid annotations.
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame named dfTool_ObsoleteOperation containing:
-        ['tool']
+    Retrieve the list of tools annotated with at least one deprecated operation.
     """
-
     query = """
-# tools with an obsolete operation annotation that has suggestions covered by another valid annotation
-# operation: compatible (rdfs:subClassOf* => 108) or more precise (rdfs:subClassOf+ => 70) than a valid operation
+    SELECT DISTINCT ?tool
+    WHERE {
+      ?tool rdf:type sc:SoftwareApplication .
+      ?tool sc:featureList/(rdfs:subClassOf*) ?deprecatedItem .
+      ?deprecatedItem owl:deprecated True .
+    }
+    ORDER BY ?tool
+    """
 
-SELECT DISTINCT ?tool #?validItem ?alternativeItem
-WHERE {
-  VALUES ?annotationType { sc:featureList } # Operation
+    sparql = SPARQLWrapper(endpointURL)
+    sparql.setQuery(prefixes + query)
+    sparql.setReturnFormat(JSON)
+    results = sparql.query().convert()
 
-  ?tool rdf:type sc:SoftwareApplication .
-  ?tool ?annotationType ?validItem .
-  ?tool ?annotationType ?deprecatedItem .
-  FILTER(STRSTARTS(STR(?tool), "https://bio.tools/"))
-  
-  { ?deprecatedItem rdfs:subClassOf owl:DeprecatedClass }
-  UNION
-  { ?deprecatedItem owl:deprecated true . }
-  UNION
-  { ?deprecatedItem owl:deprecated "true" . }
-  UNION 
-  { ?deprecatedItem owl:deprecated "True" . }
-  
-  ?deprecatedItem oboInOwl:consider ?alternativeItem .
-  ?alternativeItem rdfs:subClassOf+ ?validItem .
-}
-"""
+    data = [{"Tool": r["tool"]["value"]} for r in results["results"]["bindings"]]
+    dfToolsWithSomeDeprecatedOperation = pd.DataFrame(data)
 
-    # Execute SPARQL and return DataFrame
-    dfTool_ObsoleteOperation = sparqldataframe.query(endpointURL, prefixes + query)
-
-    # Save to compressed TSV
-    dfTool_ObsoleteOperation.to_csv(
-        "Dataframe/dfTool_ObsoleteOperation.tsv.bz2",
-        sep="\t",
-        index=False,
-        compression="bz2",
+    dfToolsWithSomeDeprecatedOperation.to_csv(
+        output_path, sep="\t", index=False, compression="bz2"
     )
-
-    return dfTool_ObsoleteOperation
+    return dfToolsWithSomeDeprecatedOperation
 
 
 def compute_topic_metrics(
@@ -2683,7 +2778,7 @@ def _resolve_annotation_type(value: str) -> str:
         "T": "Topic",
         "O": "Operation",
         "Topic": "Topic",
-        "Operation": "Operation"
+        "Operation": "Operation",
     }
     value = value.capitalize() if len(value) > 1 else value.upper()
     if value not in mapping:
@@ -2695,13 +2790,14 @@ def _resolve_annotation_type(value: str) -> str:
 # FETCH ANNOTATION LOGIC (supports multi-type)
 # -----------------------------------------
 
-def fetch_annotations(tools, annotation_types=("Topic",), heritage=True, with_label=True):
+
+def fetch_annotations(
+    tools, annotation_types=("Topic",), heritage=True, with_label=True
+):
     tools = normalize_tool_input(tools)
 
     # Normalize annotation types, remove duplicates
-    resolved_types = [
-        _resolve_annotation_type(a) for a in annotation_types
-    ]
+    resolved_types = [_resolve_annotation_type(a) for a in annotation_types]
     resolved_types = list(dict.fromkeys(resolved_types))
 
     result = {tool: {} for tool in tools}
@@ -2727,10 +2823,7 @@ def fetch_annotations(tools, annotation_types=("Topic",), heritage=True, with_la
                     for _, row in filtered.iterrows()
                 ]
             else:
-                annotations = [
-                    {"URI": row[col_uri]}
-                    for _, row in filtered.iterrows()
-                ]
+                annotations = [{"URI": row[col_uri]} for _, row in filtered.iterrows()]
 
             result[tool][ann_type] = annotations
 
@@ -2741,136 +2834,18 @@ def fetch_annotations(tools, annotation_types=("Topic",), heritage=True, with_la
 # OUTPUT: JSON
 # -----------------------------------------
 
+
 def to_json(annotations: Dict) -> str:
     return json.dumps({"annotation": annotations}, indent=2)
 
 
-# -----------------------------------------
-# OUTPUT: TURTLE
-# -----------------------------------------
+DF_TOOL_NO_TRANS = pd.read_csv(
+    "Dataframe/dfTool_NoTransitive.tsv.bz2", sep="\t", compression="bz2"
+)
+DF_TOOL_TOPICS_OPS = pd.read_csv(
+    "Dataframe/dftools_nbTopics_nbOperations.tsv.bz2", sep="\t", compression="bz2"
+)
 
-def _format_as_turtle(results: Dict, include_labels: bool = True) -> str:
-
-    ttl = [
-        "@prefix biotools: <https://bio.tools/ontology/> .",
-        "@prefix bsc: <http://bioschemas.org/> .",
-        "@prefix bsct: <http://bioschemas.org/types/> .",
-        "@prefix dcterms: <http://purl.org/dc/terms/> .",
-        "@prefix edam: <http://edamontology.org/> .",
-        "@prefix sc: <http://schema.org/> .",
-        "@prefix schema: <https://schema.org/> .",
-        "@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .",
-        "@prefix ex: <http://example.org/> .",
-        "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .",
-        ""
-    ]
-
-    for tool_uri, ann_dict in results.items():
-        tool_id = tool_uri.replace("https://bio.tools/", "")
-        ttl.append(f"ex:Tool_{tool_id} a sc:SoftwareApplication ;")
-        ttl.append(f"    sc:url <{tool_uri}> ;")
-
-        triples = []
-
-        # Topics
-        for ann in ann_dict.get("Topic", []):
-            ann_id = ann["URI"].split(":")[-1]
-            triples.append(f"    sc:applicationSubCategory ex:{ann_id} ;")
-
-        # Operations
-        for ann in ann_dict.get("Operation", []):
-            ann_id = ann["URI"].split(":")[-1]
-            triples.append(f"    sc:featureList ex:{ann_id} ;")
-
-        if triples:
-            ttl.extend(triples)
-            ttl[-1] = ttl[-1].rstrip(" ;") + " ."
-        else:
-            ttl[-1] = ttl[-1].rstrip(" ;") + " ."
-
-        ttl.append("")
-
-        # Annotation class definitions
-        for ann_type, ann_list in ann_dict.items():
-            for ann in ann_list:
-                ann_id = ann["URI"].split(":")[-1]
-                ttl.append(f"ex:{ann_id} a ex:{ann_type} ;")
-                if include_labels and "label" in ann:
-                    ttl.append(f'    rdfs:label "{ann["label"]}" .')
-                else:
-                    ttl[-1] = ttl[-1].rstrip(" ;") + " ."
-                ttl.append("")
-                
-    """
-    test_turtle = "\n".join(ttl)
-    G = rdflib.Graph()
-    G.parse(data = test_turtle, format = "turtle")
-    """
-    return "\n".join(ttl)
-
-
-# -----------------------------------------
-# OUTPUT: SPARQL
-# -----------------------------------------
-
-def _format_as_sparql(tool_urls: List[str], annotation_types: List[str], transitive: bool) -> str:
-
-    tools_values = " ".join([f"<{url}>" for url in tool_urls])
-    want_topic = any(a.lower() == "topic" for a in annotation_types)
-    want_operation = any(a.lower() == "operation" for a in annotation_types)
-
-    # Construct transitive topic hierarchy query
-    if transitive and want_topic:
-        return f"""PREFIX sc: <http://schema.org/>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX owl: <http://www.w3.org/2002/07/owl#>
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-
-CONSTRUCT {{
-    ?tool sc:applicationSubCategory ?superTopic .
-}}
-WHERE {{
-    VALUES ?tool {{ {tools_values} }}
-    ?tool rdf:type sc:SoftwareApplication .
-    ?tool sc:applicationSubCategory ?topic .
-    ?topic rdfs:subClassOf* ?superTopic .
-    ?superTopic rdf:type owl:Class .
-}}"""
-
-    # SELECT variant (non-transitive)
-    query = f"""PREFIX sc: <http://schema.org/>
-PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-
-SELECT ?tool ?topic ?topicLabel ?operation ?operationLabel
-WHERE {{
-    VALUES ?tool {{ {tools_values} }}
-    ?tool rdf:type sc:SoftwareApplication .
-"""
-
-    if want_topic:
-        query += """
-    OPTIONAL {
-        ?tool sc:applicationSubCategory ?topic .
-        OPTIONAL { ?topic rdfs:label ?topicLabel . }
-    }
-"""
-
-    if want_operation:
-        query += """
-    OPTIONAL {
-        ?tool sc:featureList ?operation .
-        OPTIONAL { ?operation rdfs:label ?operationLabel . }
-    }
-"""
-
-    query += "}"
-
-    return query
-
-
-DF_TOOL_NO_TRANS = pd.read_csv("Dataframe/dfTool_NoTransitive.tsv.bz2", sep="\t", compression='bz2')
-DF_TOOL_TOPICS_OPS = pd.read_csv("Dataframe/dftools_nbTopics_nbOperations.tsv.bz2", sep="\t", compression='bz2')
 
 def get_tool_metrics(tool: str, heritage: bool = True, metric: str = "all") -> dict:
     """
@@ -2890,14 +2865,16 @@ def get_tool_metrics(tool: str, heritage: bool = True, metric: str = "all") -> d
     dict
         A dictionary with the tool’s metrics.
     """
-    tool_url = tool if tool.startswith("https://bio.tools/") else f"https://bio.tools/{tool}"
-    
+    tool_url = (
+        tool if tool.startswith("https://bio.tools/") else f"https://bio.tools/{tool}"
+    )
+
     # Choose the appropriate dataframes based on heritage mode
     df_metrics = dfToolallmetrics if heritage else dfToolallmetrics_NT
     df_counts = DF_TOOL_TOPICS_OPS if heritage else DF_TOOL_NO_TRANS
 
-    row_metrics = df_metrics[df_metrics['tool'] == tool_url]
-    row_counts = df_counts[df_counts['tool'] == tool_url]
+    row_metrics = df_metrics[df_metrics["tool"] == tool_url]
+    row_counts = df_counts[df_counts["tool"] == tool_url]
 
     if row_metrics.empty and row_counts.empty:
         raise ValueError(f"Tool not found: {tool_url}")
@@ -2911,9 +2888,12 @@ def get_tool_metrics(tool: str, heritage: bool = True, metric: str = "all") -> d
     if metric in ("ic", "all"):
         result["topicScore"] = float(metrics.get("topicScore", 0))
         result["operationScore"] = float(metrics.get("operationScore", 0))
-    
+        result["score"] = float(metrics.get("score", 0))
+
     # Entropy
     if metric in ("entropy", "all"):
+        result["topicEntropy"] = float(metrics.get("topicEntropy", 0))
+        result["operationEntropy"] = float(metrics.get("operationEntropy", 0))
         result["entropy"] = float(metrics.get("entropy", 0))
 
     # Count of annotations
@@ -2928,11 +2908,7 @@ def format_tool_annotations(metrics: dict) -> dict:
     """
     Format the tool metrics into the EDAM annotation dict structure.
     """
-    return {
-        "annotation": {
-            "Metrics": metrics
-        }
-    }
+    return {"annotation": {"Metrics": metrics}}
 
 
 def fetch_annotations_with_metrics(
@@ -2941,7 +2917,7 @@ def fetch_annotations_with_metrics(
     heritage=True,
     with_label=True,
     metric="all",
-    include_annotations=True
+    include_annotations=True,
 ):
     """
     Fetch EDAM annotations and/or tool metrics together in one structured dict.
@@ -2984,7 +2960,7 @@ def fetch_annotations_with_metrics(
             tools,
             annotation_types=annotation_types,
             transitive=heritage,  # kept for backward compat inside fetch_annotations()
-            with_label=with_label
+            with_label=with_label,
         )
 
     # Merge metrics and annotations per tool
@@ -2995,10 +2971,24 @@ def fetch_annotations_with_metrics(
             metrics = {}
 
         # Safely populate annotation categories
-        topic_anns = annotation_data.get(tool, {}).get("Topic", []) if include_annotations else []
-        op_anns = annotation_data.get(tool, {}).get("Operation", []) if include_annotations else []
-        data_anns = annotation_data.get(tool, {}).get("Data", []) if include_annotations else []
-        format_anns = annotation_data.get(tool, {}).get("Format", []) if include_annotations else []
+        topic_anns = (
+            annotation_data.get(tool, {}).get("Topic", [])
+            if include_annotations
+            else []
+        )
+        op_anns = (
+            annotation_data.get(tool, {}).get("Operation", [])
+            if include_annotations
+            else []
+        )
+        data_anns = (
+            annotation_data.get(tool, {}).get("Data", []) if include_annotations else []
+        )
+        format_anns = (
+            annotation_data.get(tool, {}).get("Format", [])
+            if include_annotations
+            else []
+        )
 
         combined[tool] = {
             "annotation": {
@@ -3006,7 +2996,7 @@ def fetch_annotations_with_metrics(
                 "Operation": op_anns,
                 "Data": data_anns,
                 "Format": format_anns,
-                "Metrics": metrics
+                "Metrics": metrics,
             }
         }
 

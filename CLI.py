@@ -1,5 +1,8 @@
 import os
+from turtle import color
 import click
+import json
+
 
 # Import your dataframe-generating functions
 import EDAMannot as edam
@@ -12,10 +15,11 @@ import EDAMannot as edam
 @click.group()
 def cli():
     """
-    EDAMannot is a command-line toolbox using ShareFAIR-KG. 
+    EDAMannot is a command-line toolbox using ShareFAIR-KG.
     The toolbox offersprocessing, metrics and visualisation features leveraging the EDAM hierarchy.
     """
     pass
+
 
 # -----------------------------------------------------
 # INIT COMMAND
@@ -26,9 +30,9 @@ def cli():
 def initialize():
     """
     Compute all tables containing metrics and annotation information for the tools available in bio.tools.
-    
-    These dataframes are necessary for the toolkit to function. 
-    
+
+    These dataframes are necessary for the toolkit to function.
+
     Command usage : python3 CLI.py init
     """
     click.echo("=== EDAMannot Initialization ===")
@@ -119,13 +123,22 @@ def initialize():
     # ------------------------------------------------------------
     # SPECIAL DIAGNOSTIC QUERIES
     # ------------------------------------------------------------
-    click.echo("→ Getting dfToolTopic_NotOWLClass")
-    dfToolTopic_NotOWLClass = edam.get_dfToolTopic_NotOWLClass()
-    generated_files.append("Dataframe/dfToolTopic_NotOWLClass.tsv.bz2")
 
-    click.echo("→ Getting dfTool_ObsoleteOperation")
-    dfTool_ObsoleteOperation = edam.get_dfTool_ObsoleteOperation()
-    generated_files.append("Dataframe/dfTool_ObsoleteOperation.tsv.bz2")
+    click.echo("→ Getting dfDeprecatedItems")
+    dfDeprecatedItems = edam.get_dfDeprecatedItems()
+    generated_files.append("Dataframe/dfDeprecatedItems.tsv.bz2")
+
+    click.echo("→ Getting dfDeprecatedSuggestedItems")
+    dfDeprecatedSuggestedItems = edam.get_dfDeprecatedSuggestedItems()
+    generated_files.append("Dataframe/dfDeprecatedSuggestedItems.tsv.bz2")
+
+    click.echo("→ Getting dfToolsWithSomeDeprecatedTopic")
+    dfToolsWithSomeDeprecatedTopic = edam.get_dfToolsWithSomeDeprecatedTopic()
+    generated_files.append("Dataframe/dfToolsWithSomeDeprecatedTopic.tsv.bz2")
+
+    click.echo("→ Getting dfToolsWithSomeDeprecatedOperation")
+    dfToolsWithSomeDeprecatedOperation = edam.get_dfToolsWithSomeDeprecatedOperation()
+    generated_files.append("Dataframe/dfToolsWithSomeDeprecatedOperation.tsv.bz2")
 
     # ------------------------------------------------------------------
     # 7) METRICS TABLES
@@ -165,34 +178,38 @@ def initialize():
 @click.command(name="QC")
 @click.argument("tools", nargs=-1)
 @click.option(
-    "--heritage", "-h",
+    "--heritage",
+    "-h",
     is_flag=True,
     default=False,
-    help="Use heritage (inherited) metrics and annotations (default: False)"
+    help="Use heritage (inherited) metrics and annotations (default: False)",
 )
 @click.option(
-    "--metric", "-m",
+    "--metric",
+    "-m",
     default="all",
     type=click.Choice(["ic", "entropy", "count", "all"], case_sensitive=False),
-    help="Which metric to fetch: 'ic', 'entropy', 'count', or 'all'"
+    help="Which metric to fetch: 'ic', 'entropy', 'count', or 'all'",
 )
 @click.option(
     "--annotations",
     is_flag=True,
     default=True,
-    help="Include EDAM annotations in the output (default: True)"
+    help="Include EDAM annotations in the output (default: True)",
 )
 @click.option(
-    "--no-annotations", "-noa",
+    "--no-annotations",
+    "-noa",
     is_flag=True,
     default=False,
-    help="Exclude EDAM annotations from the output (alias: -noa)"
+    help="Exclude EDAM annotations from the output (alias: -noa)",
 )
 @click.option(
-    "--output_format", "-f",
+    "--output_format",
+    "-f",
     default="json",
     type=click.Choice(["json", "dict"], case_sensitive=False),
-    help="Output format"
+    help="Output format",
 )
 def qc(tools, heritage, metric, annotations, no_annotations, output_format):
     """
@@ -201,9 +218,9 @@ def qc(tools, heritage, metric, annotations, no_annotations, output_format):
     Examples of command usage :
 
     python3 CLI.py QC https://bio.tools/star --heritage --metric all --output_format json
-    
+
     or using alias options :
-    
+
     python3 CLI.py QC star -h -m all -f json
 
     To exclude annotations from the output, see only direct annotations metrics and see selected metrics only :
@@ -226,11 +243,10 @@ def qc(tools, heritage, metric, annotations, no_annotations, output_format):
         heritage=heritage,
         with_label=True,
         metric=metric,
-        include_annotations=include_annotations
+        include_annotations=include_annotations,
     )
 
     if output_format.lower() == "json":
-        import json
         click.echo(json.dumps(results, indent=2))
     else:
         click.echo(results)
@@ -273,11 +289,11 @@ def describe(tools, annotation, heritage, no_label, output_format):
     Describe tools with EDAM annotations can use heritage annotations.
 
     Example command usage :
-    
+
     python3 CLI.py describe https://bio.tools/qiime2 --annotation_type Topic --annotation_type Operation --heritage --output_format json
-   
+
     or using alias options :
-    
+
     python3 CLI.py describe qiime2 -a T -a O -h -f json
     """
 
@@ -326,7 +342,7 @@ def describe(tools, annotation, heritage, no_label, output_format):
     required=True,
     help="Tool name(s) (e.g. bwa, qiime2). Can be used multiple times.",
 )
-@click.option(    
+@click.option(
     "--output_format",
     "-f",
     type=click.Choice(["SVG", "PNG", "PDF", "CSV"], case_sensitive=False),
@@ -339,6 +355,23 @@ def describe(tools, annotation, heritage, no_label, output_format):
     type=click.Path(writable=True),
     help="Output filename without extension.",
 )
+@click.option(
+    "--color-by",
+    "-cby",
+    type=click.Choice(["none", "count", "ic", "entropy"], case_sensitive=False),
+    default="none",
+    help="Color topics and operations according to a metric.",
+)
+@click.option(
+    "--color-channel",
+    "-cc",
+    type=click.Choice(
+        ["red", "green", "blue", "orange", "yellow", "pink", "grey"],
+        case_sensitive=False,
+    ),
+    default="red",
+    help="Color channel used for score-based node coloring.",
+)
 def describe_graph(
     show_topics,
     show_operations,
@@ -347,18 +380,22 @@ def describe_graph(
     title,
     output_format,
     output,
+    color_by,
+    color_channel,
 ):
     """
-   Generate a graph to describe one or more tools using direct and legacy EDAM annotations.
-   You can color the annotations according to metrics (Count, IC, entropy). 
-   
-    Example command usage :
-    
-    python3 CLI.py describe-viz --show-topics --show-operations --highlight --show-deprecated --title bwa --title qiime2 --output_format SVG --output bwa_qiime2_common_graph
-    
-    or using alias options :
-    
-    python3 CLI.py describe-viz -o -h -d --title bwa --title qiime2 -f SVG -O bwa_qiime2_common_graph
+    Generate a graph to describe one or more tools using direct and legacy EDAM annotations.
+    You can color the annotations according to metrics (Count, IC, entropy).
+
+     Example command usage :
+
+     python3 CLI.py describe-viz --show-topics --show-operations --highlight
+     --show-deprecated --title bwa --title qiime2  --color-by count --color-channel red
+     --output_format SVG --output bwa_qiime2_common_graph
+
+     or using alias options :
+
+     python3 CLI.py describe-viz -o -h -d --title bwa --title qiime2 --cby count --cc red -f SVG -O bwa_qiime2_common_graph
     """
 
     BIOTOOLS_URI = "https://bio.tools/"
@@ -376,6 +413,29 @@ def describe_graph(
             showDeprecatedAnnotations=show_deprecated,
             highlightDirectAnnotations=True,
         )
+
+        # Coloring according to metric
+        if color_by.lower() != "none":
+            metric_map = {
+                "count": "nbTools",
+                "ic": "IC",
+                "entropy": "entropy",
+            }
+
+            metric_col = metric_map[color_by.lower()]
+
+            # Build the dicts for this metric
+            dictTopicScore, dictOperationScore = edam.buildTopicOperationDicts(
+                metric_col
+            )
+
+            # Apply coloring to graph
+            edam.colorGraphNodesAccordingToScore(
+                graph,
+                dictTopicScore,
+                dictOperationScore,
+                color=color_channel,
+            )
 
         # CSV mode
         if output_format.lower() == "csv":
@@ -411,12 +471,31 @@ def describe_graph(
         highlightDirectAnnotations=False,
     )
 
+    # Coloring according to metric
+    if color_by.lower() != "none":
+        metric_map = {
+            "count": "nbTools",
+            "ic": "IC",
+            "entropy": "entropy",
+        }
+        metric_col = metric_map[color_by.lower()]
+
+        dictTopicScore, dictOperationScore = edam.buildTopicOperationDicts(metric_col)
+
+        edam.colorGraphNodesAccordingToScore(
+            graph,
+            dictTopicScore,
+            dictOperationScore,
+            color=color_channel,
+        )
+
     data = graph.draw(prog="dot", format=output_format.lower())
     filename = f"{output or 'common_graph'}.{output_format.lower()}"
     with open(filename, "wb") as f:
         f.write(data)
 
     click.echo(f"Graph saved as {filename}")
+
 
 cli.add_command(qc)
 
