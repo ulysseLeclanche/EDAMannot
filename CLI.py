@@ -465,7 +465,7 @@ def describe_graph(
         cli.py describe-graph -t -o -h -n --title bwa --title qiime2 --output_format CSV
     """
     # Ensure Fuseki is running
-    launch_fuseki_server()
+    #launch_fuseki_server()
 
     BIOTOOLS_URI = "https://bio.tools/"
     tool_uris = [BIOTOOLS_URI + t for t in title]
