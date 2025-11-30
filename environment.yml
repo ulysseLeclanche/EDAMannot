@@ -1,0 +1,14 @@
+name: EDAMannot
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13.1
+  - click
+  - pandas
+  - ipython
+  - numpy
+  - pygraphviz
+  - pip
+  - pip:
+      - sparqldataframe
+      - SPARQLWrapper
