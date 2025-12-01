@@ -1,6 +1,6 @@
 # EDAMannot
 
-EDAMannot is a command-line toolbox leveraging the **ShareFAIR-KG** knowledge graph. It provides processing, metrics, and visualization features based on the **EDAM ontology**.  
+EDAMannot is a command-line toolbox leveraging the **ShareFAIR-KG** knowledge graph from the [ShareFAIR Knowledge Base](https://zenodo.org/records/17737888). It provides processing, metrics, and visualization features based on the [**EDAM ontology**](https://edamontology.org/page).  
 The toolbox is particularly useful for EDAM annotations of tools registered in the [bio.tools registry](https://bio.tools/).
 This knowledge base and toolbox are supported by the [ShareFAIR](https://projet.liris.cnrs.fr/sharefair/) project WP2.
 
@@ -33,18 +33,25 @@ conda activate EDAMannot
 ```
 
 3. **Connect to the ShareFAIR-KG knowledge graph**:
+
 Clone the repository and its submodules:
 
 ```bash
-git clone --recurse-submodules https://gitlab.liris.cnrs.fr/sharefair/knowledge_base_workflow_annotations/knowledge_base.git
+git clone --recurse-submodules https://gitlab.liris.cnrs.fr/sharefair/knowledge_base_workflow_annotations/ShareFAIR-KG
 ```
 
-Follow the deployment instructions here: [ShareFAIR-KG deployment guide](https://gitlab.liris.cnrs.fr/sharefair/knowledge_base_workflow_annotations/knowledge_base#deploy-and-query-the-knowlegde-base)
+To locally deploy the knowledge base, run `start_knowlegde_base_server.sh` file:
+```bash
+./start_knowlegde_base_server.sh
+```
+
+You can follow the detailed deployment instructions here: [ShareFAIR-KG deployment guide](https://gitlab.liris.cnrs.fr/sharefair/knowledge_base_workflow_annotations/ShareFAIR-KG#deploy-and-query-the-knowlegde-base)
 
 Note: Full functionality of EDAMannot requires a deployed ShareFAIR-KG instance.
 
 ## Usage
-Once the knowledge graph is deployed, you can use the toolbox from the `EDAMannot` folder:
+Once the knowledge graph is deployed, you can use the toolbox from the `EDAMannot` folder. 
+You must be in the EDAMannot folder to use it: 
 
 ```bash
 python3 CLI.py --help
@@ -76,8 +83,12 @@ This project is licensed under the GNU GPLv3 License. See the [LICENSE](LICENSE)
 
 ## Authors and Contact
 
-- Ulysse LE CLANCHE
-- Olivier DAMERON
-- Alban GAIGNARD
+- Ulysse LE CLANCHE¹  
+- Olivier DAMERON²  
+- Alban GAIGNARD³  
 
-Affiliations: Université de Rennes, IRISA de Rennes, Université de Nantes
+### Affiliations
+
+¹ Université Rennes, Inria, CNRS, IRISA—UMR 6074, Rennes 35000, France  
+² Université Rennes, Inria, CNRS, IRISA—UMR 6074, Rennes 35000, France  
+³ Nantes Université, CNRS, INSERM, l’institut du thorax, F-44000 Nantes, France
