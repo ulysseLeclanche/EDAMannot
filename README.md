@@ -22,6 +22,7 @@ This knowledge base and toolbox are supported by the [ShareFAIR](https://projet.
 
 ```bash
 git clone https://github.com/ulysseLeclanche/EDAMannot.git
+```
 
 ```bash
 cd EDAMannot
@@ -31,6 +32,9 @@ cd EDAMannot
 
 ```bash
 conda env create -f environment.yml
+```
+
+```bash
 conda activate EDAMannot
 ```
 
