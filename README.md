@@ -18,21 +18,23 @@ This knowledge base and toolbox are supported by the [ShareFAIR](https://projet.
 
 ## Installation
 
-1. **Clone the EDAMannot repository**:
+1. **Clone the EDAMannot repository**
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/EDAMannot.git
+git clone https://github.com/ulysseLeclanche/EDAMannot.git
+
+```bash
 cd EDAMannot
 ```
 
-2. **Create a conda environment from the `environment.yml` file**:
+2. **Create a conda environment from the `environment.yml` file**
 
 ```bash
 conda env create -f environment.yml
 conda activate EDAMannot
 ```
 
-3. **Connect to the ShareFAIR-KG knowledge graph**:
+3. **Connect to the ShareFAIR-KG knowledge graph**
 
 Clone the repository and its submodules:
 
@@ -52,6 +54,10 @@ Note: Full functionality of EDAMannot requires a deployed ShareFAIR-KG instance.
 ## Usage
 Once the knowledge graph is deployed, you can use the toolbox from the `EDAMannot` folder. 
 You must be in the EDAMannot folder to use it: 
+
+```bash
+cd EDAMannot
+```
 
 ```bash
 python3 CLI.py --help
