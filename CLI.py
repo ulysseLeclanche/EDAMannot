@@ -15,7 +15,7 @@ import EDAMannot as edam
 def cli():
     """
     EDAMannot is a command-line toolbox using ShareFAIR-KG.
-    The toolbox offersprocessing, metrics and visualisation features leveraging the EDAM hierarchy.
+    The toolbox offers processing, metrics and visualisation features leveraging the EDAM hierarchy.
     """
     pass
 
