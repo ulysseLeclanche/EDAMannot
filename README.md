@@ -81,4 +81,3 @@ This project is licensed under the GNU GPLv3 License. See the [LICENSE](LICENSE)
 - Alban GAIGNARD
 
 Affiliations: Université de Rennes, IRISA de Rennes, Université de Nantes
-Conference: [SWAT4HCLS 2026](https://www.swat4ls.org/)
