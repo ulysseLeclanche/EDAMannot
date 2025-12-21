@@ -87,6 +87,40 @@ All commands support `--help` for detailed options and examples of use:
 python3 CLI.py command_name --help
 ```
 
+Here are examples of uses for each of the commands:
+
+#### describe
+
+```bash
+    python3 CLI.py describe https://bio.tools/multiqc --annotation_type Topic --annotation_type Operation --heritage --output_format json
+```
+or using alias options :
+```bash
+    python3 CLI.py describe qiime2 -a T -a O -h -f json
+```
+
+#### describe-viz
+
+```bash
+     python3 CLI.py describe-viz --show-topics --show-operations --highlight
+     --show-deprecated --title bwa --title qiime2  --color-by count --color-channel red
+     --output_format SVG --output bwa_qiime2_common_graph
+```
+or using alias options :
+```bash
+     python3 CLI.py describe-viz -o -h -d --title bwa --title qiime2 -cby count -cc red -f SVG -O bwa_qiime2_common_graph
+```
+
+#### QC
+
+```bash
+    python3 CLI.py QC https://bio.tools/star --heritage --metric all --output_format json
+```
+or using alias options :
+```bash
+    python3 CLI.py QC star -h -m all -f json
+```
+
 ## License
 
 This project is licensed under the GNU GPLv3 License. See the [LICENSE](LICENSE) file for details.
