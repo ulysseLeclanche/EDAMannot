@@ -11,3 +11,9 @@ fuseki.pid
 # Test pictures
 *.svg
 *.png
+
+annotation_tools.txt
+multiqc_annotation.txt
+Direct_EDAM_annotation_all_tools_bio_tools.txt
+Direct_annotation_all_metrics_tools_bio_tools_inGT.txt
+InDirect_annotation_all_metrics_tools_bio_tools_inGT.txt

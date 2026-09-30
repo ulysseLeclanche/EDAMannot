@@ -270,6 +270,13 @@ def qc(tools, heritage, metric, annotations, no_annotations, output_format):
     help="Use heritage (inherited) annotations (default: False)",
 )
 @click.option(
+    "--transversal-classes",
+    "-tc",
+    is_flag=True,
+    default=False,
+    help="Infer transversal EDAM classes using neighbor relations",
+)
+@click.option(
     "--no-label",
     "-nL",
     is_flag=True,
@@ -283,17 +290,24 @@ def qc(tools, heritage, metric, annotations, no_annotations, output_format):
     type=click.Choice(["json", "dict"], case_sensitive=False),
     help="Output format",
 )
-def describe(tools, annotation, heritage, no_label, output_format):
+def describe(
+    tools,
+    annotation,
+    heritage,
+    no_label,
+    output_format,
+    transversal_classes,
+):
     """
     Describe tools with EDAM annotations can use heritage annotations.
 
     Example command usage :
 
-    python3 CLI.py describe https://bio.tools/qiime2 --annotation_type Topic --annotation_type Operation --heritage --output_format json
+    python3 CLI.py describe https://bio.tools/multiqc --annotation_type Topic --annotation_type Operation --heritage --transversal-classes --output_format json
 
     or using alias options :
 
-    python3 CLI.py describe qiime2 -a T -a O -h -f json
+    python3 CLI.py describe qiime2 -a T -a O -h -tc -f json
     """
 
     annotations = edam.fetch_annotations(
@@ -302,6 +316,29 @@ def describe(tools, annotation, heritage, no_label, output_format):
         heritage=heritage,
         with_label=not no_label,
     )
+    
+    annotations = edam.fetch_annotations(
+    tools,
+    annotation_types=annotation,
+    heritage=heritage,
+    with_label=not no_label,
+)
+
+    if transversal_classes:
+        for tool, ann_types in annotations.items():
+            for ann_type, ann_list in ann_types.items():
+
+                inferred = edam.infer_neighbors_from_annotations(
+                    ann_list,
+                    ann_type=ann_type,
+                    with_label=not no_label,
+                )
+
+                annotations[tool][ann_type] = edam.merge_annotations(
+                    ann_list,
+                    inferred
+                )
+
 
     if output_format.lower() == "json":
         click.echo(edam.to_json(annotations))

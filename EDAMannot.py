@@ -7,6 +7,7 @@ import pygraphviz as pgv
 import sparqldataframe
 from SPARQLWrapper import SPARQLWrapper, JSON
 from typing import Dict
+from rdflib import Graph, Namespace
 
 
 # === Global variables ===
@@ -3001,3 +3002,88 @@ def fetch_annotations_with_metrics(
         }
 
     return combined
+
+notebooks_dir = os.path.join(current_dir, "Notebooks")
+edam_neighbors_file = os.path.join(notebooks_dir, "EDAM_neighbors_result.ttl")
+EDAM = Namespace("http://edamontology.org/")
+
+def infer_edam_neighbors(
+    input_entities,
+    include_predicates=None,
+    include_inverse=True,
+):
+    g = Graph()
+    g.parse(edam_neighbors_file, format="turtle")
+
+    results = {}
+
+    for entity in input_entities:
+        entity_uri = EDAM[entity]
+        results[f"edam:{entity}"] = {}
+
+        # Outgoing relations
+        for p, o in g.predicate_objects(entity_uri):
+            pred_name = p.split("/")[-1]
+
+            if include_predicates and pred_name not in include_predicates:
+                continue
+
+            results[f"edam:{entity}"].setdefault(
+                f"edam:{pred_name}", []
+            ).append(o.split("/")[-1])
+
+        # Incoming relations
+        if include_inverse:
+            for s, p in g.subject_predicates(entity_uri):
+                pred_name = p.split("/")[-1]
+
+                if include_predicates and pred_name not in include_predicates:
+                    continue
+
+                results[f"edam:{entity}"].setdefault(
+                    f"edam:inverse_{pred_name}", []
+                ).append(s.split("/")[-1])
+
+    return results
+
+
+
+def edam_uri_to_id(uri: str) -> str:
+    return uri.rsplit("/", 1)[-1]
+
+def merge_annotations(existing, inferred):
+    """
+    Merge two annotation lists without duplicates (by URI).
+    """
+    seen = {ann["URI"] for ann in existing}
+    merged = list(existing)
+
+    for ann in inferred:
+        if ann["URI"] not in seen:
+            merged.append(ann)
+            seen.add(ann["URI"])
+
+    return merged
+
+def infer_neighbors_from_annotations(
+    annotations,
+    ann_type,
+    with_label=True,
+):
+    edam_ids = [edam_uri_to_id(a["URI"]) for a in annotations]
+
+    neighbors = infer_edam_neighbors(
+        edam_ids,
+        include_inverse=True,
+    )
+
+    inferred = []
+
+    for _, relations in neighbors.items():
+        for _, targets in relations.items():
+            for target in targets:
+                inferred.append({
+                    "URI": f"http://edamontology.org/{target}"
+                })
+
+    return inferred
