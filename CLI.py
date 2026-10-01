@@ -2,6 +2,8 @@ import os
 import click
 import json
 
+# EDAM annotation enrichment via Fuseki
+from edamannot.enrichment import enriched_annotation as run_enriched_annotation
 
 # Import your dataframe-generating functions
 import EDAMannot as edam
@@ -172,6 +174,66 @@ def initialize():
     click.echo("\n=== Generated files: ===")
     for f in generated_files:
         click.echo(f"  - {f}")
+
+
+# -----------------------------------------------------
+# ENRICHED ANNOTATION COMMAND
+# -----------------------------------------------------
+
+@cli.command(name="enriched_annotation")
+@click.argument(
+    "input_ttl",
+    type=click.Path(
+        exists=True,
+        dir_okay=False,
+        readable=True,
+    ),
+)
+@click.argument(
+    "output_ttl",
+    type=click.Path(
+        dir_okay=False,
+    ),
+)
+@click.option(
+    "--fuseki",
+    default="http://localhost:3030/sharefair",
+    show_default=True,
+    help="Fuseki dataset URL.",
+)
+@click.option(
+    "--keep-graphs",
+    is_flag=True,
+    default=False,
+    help="Keep temporary Fuseki named graphs after the run.",
+)
+def enriched_annotation_command(input_ttl, output_ttl, fuseki, keep_graphs):
+    """
+    Enrich a Bioschemas TTL with EDAM neighbor annotations.
+
+    Processes Topic, Operation, Data and Format annotations.
+
+    Example:
+
+    \b
+      python CLI.py enriched_annotation bioschemas-dump.ttl bioschemas_enriched.ttl
+    """
+    click.echo("=== EDAMannot Enriched Annotation ===")
+    click.echo(f"Input : {input_ttl}")
+    click.echo(f"Output: {output_ttl}")
+    click.echo(f"Fuseki: {fuseki}")
+
+    try:
+        run_enriched_annotation(
+            input_path=input_ttl,
+            output_path=output_ttl,
+            fuseki_url=fuseki,
+            keep_graphs=keep_graphs,
+        )
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo("=== Enrichment completed successfully ===")
 
 
 @click.command(name="QC")

@@ -81,6 +81,8 @@ EDAMannot provides the following main commands:
 
 `QC` – Compute annotation quality metrics, including annotation counts, frequency, informative content (IC), and Shannon entropy.
 
+`enriched_annotation` – Enrich a Bioschemas TTL file with inferred EDAM annotations for Topics, Operations, Data, and Formats using EDAM neighbor relationships.
+
 ## Examples
 All commands support `--help` for detailed options and examples of use:
 ```bash
@@ -119,6 +121,29 @@ python3 CLI.py QC https://bio.tools/star --heritage --metric all --output_format
 or using alias options :
 ```bash
 python3 CLI.py QC star -h -m all -f json
+```
+
+### enriched_annotation
+
+Place the input Bioschemas TTL file in the `data/` directory and run:
+
+```bash
+python3 CLI.py enriched_annotation data/bioschemas-dump.ttl data/bioschemas_enriched.ttl
+```
+
+This command uses the local ShareFAIR-KG Fuseki instance and creates a new enriched TTL file without modifying the original.
+
+> Fuseki must be started with update support (`--update`).
+For `enriched_annotation`, Fuseki must be started with update support in /knowledge_base folder :
+
+```bash
+./fuseki-server --loc=/fuseki/databases/ --update /sharefair
+```
+
+Check that Fuseki is available:
+
+```bash
+curl -s http://localhost:3030/$/server | jq
 ```
 
 ## License
