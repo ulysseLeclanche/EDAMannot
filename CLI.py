@@ -316,13 +316,6 @@ def describe(
         heritage=heritage,
         with_label=not no_label,
     )
-    
-    annotations = edam.fetch_annotations(
-    tools,
-    annotation_types=annotation,
-    heritage=heritage,
-    with_label=not no_label,
-)
 
     if transversal_classes:
         for tool, ann_types in annotations.items():
@@ -503,6 +496,7 @@ def describe_graph(
         graph=None,
         showTopics=show_topics,
         showOperations=show_operations,
+        showDeprecatedAnnotations=show_deprecated,
         highlightIntersection=highlight,
         highlightDirectAnnotations=False,
     )
