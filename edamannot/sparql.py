@@ -13,10 +13,6 @@ Responsibilities
 - Convert SPARQL JSON results to pandas DataFrames.
 - Display SPARQL results in a Jupyter/IPython environment.
 - Retrieve the EDAM ontology version.
-
-The historical public helper names are intentionally preserved so the
-refactoring can be introduced incrementally without changing the behavior of
-the current EDAMannot.py API.
 """
 
 from typing import Any, Optional

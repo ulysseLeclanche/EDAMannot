@@ -1,11 +1,6 @@
 """
 Graph and visualization utilities for EDAMannot.
 
-This module contains the Graphviz-related functions extracted from the original
-EDAMannot.py.  The public function names and call signatures are preserved so
-that the compatibility facade can re-export them without requiring changes in
-CLI.py.
-
 SPARQL access is delegated to edamannot.sparql, while tool annotation helpers
 are delegated to edamannot.annotations. Metric DataFrames are loaded lazily
 when graph colouring is requested, avoiding import-time file I/O.
