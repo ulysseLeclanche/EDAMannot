@@ -1,9 +1,13 @@
 import os
 import click
 import json
+import subprocess
+import time
+from pathlib import Path
 
 # EDAM annotation enrichment via Fuseki
-from edamannot.enrichment import enriched_annotation as run_enriched_annotation
+from edamannot.build_edam_neighbors import build_edam_neighbors
+from edamannot.enriched_annotation import enriched_annotation
 
 # Import your dataframe-generating functions
 import EDAMannot as edam
@@ -180,60 +184,60 @@ def initialize():
 # ENRICHED ANNOTATION COMMAND
 # -----------------------------------------------------
 
+
+def start_fuseki(data_file):
+    fuseki_home = os.getenv("FUSEKI_HOME")
+    fuseki = str(Path(fuseki_home) / "fuseki-server") if fuseki_home else "fuseki-server"
+
+    return subprocess.Popen(
+        [
+            fuseki,
+            "--port=3031",
+            f"--file={data_file}",
+            "/edam",
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def stop_fuseki(process):
+    process.terminate()
+    process.wait()
+
+
 @cli.command(name="enriched_annotation")
-@click.argument(
-    "input_ttl",
-    type=click.Path(
-        exists=True,
-        dir_okay=False,
-        readable=True,
-    ),
-)
-@click.argument(
-    "output_ttl",
-    type=click.Path(
-        dir_okay=False,
-    ),
-)
-@click.option(
-    "--fuseki",
-    default="http://localhost:3030/sharefair",
-    show_default=True,
-    help="Fuseki dataset URL.",
-)
-@click.option(
-    "--keep-graphs",
-    is_flag=True,
-    default=False,
-    help="Keep temporary Fuseki named graphs after the run.",
-)
-def enriched_annotation_command(input_ttl, output_ttl, fuseki, keep_graphs):
+def enriched_annotation_command():
     """
-    Enrich a Bioschemas TTL with EDAM neighbor annotations.
-
-    Processes Topic, Operation, Data and Format annotations.
-
-    Example:
-
-    \b
-      python CLI.py enriched_annotation bioschemas-dump.ttl bioschemas_enriched.ttl
+    Build the EDAM neighbor graph and enrich the local Bioschemas dump.
     """
+    data_dir = Path(__file__).resolve().parent / "data"
+    edam_file = data_dir / "EDAM.owl"
+    neighbors_file = data_dir / "edam_neighbors.ttl"
+    input_file = data_dir / "bioschemas-dump.ttl"
+    output_file = data_dir / "bioschemas-dump_enriched.ttl"
+
     click.echo("=== EDAMannot Enriched Annotation ===")
-    click.echo(f"Input : {input_ttl}")
-    click.echo(f"Output: {output_ttl}")
-    click.echo(f"Fuseki: {fuseki}")
+
+    click.echo("→ Building edam_neighbors.ttl")
+    fuseki = start_fuseki(edam_file)
+    time.sleep(2)
 
     try:
-        run_enriched_annotation(
-            input_path=input_ttl,
-            output_path=output_ttl,
-            fuseki_url=fuseki,
-            keep_graphs=keep_graphs,
-        )
-    except Exception as exc:
-        raise click.ClickException(str(exc)) from exc
+        build_edam_neighbors()
+    finally:
+        stop_fuseki(fuseki)
 
-    click.echo("=== Enrichment completed successfully ===")
+    click.echo("→ Enriching bioschemas-dump.ttl")
+    fuseki = start_fuseki(neighbors_file)
+    time.sleep(2)
+
+    try:
+        enriched_annotation(input_file, output_file)
+    finally:
+        stop_fuseki(fuseki)
+
+    click.echo(f"Generated: {output_file}")
 
 
 @click.command(name="QC")

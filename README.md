@@ -125,25 +125,34 @@ python3 CLI.py QC star -h -m all -f json
 
 ### enriched_annotation
 
-Place the input Bioschemas TTL file in the `data/` directory and run:
+The command automatically builds the EDAM neighbor graph locally, then enriches the Bioschemas dump:
 
 ```bash
-python3 CLI.py enriched_annotation data/bioschemas-dump.ttl data/bioschemas_enriched.ttl
+python3 CLI.py enriched_annotation
 ```
 
-This command uses the local ShareFAIR-KG Fuseki instance and creates a new enriched TTL file without modifying the original.
+The command uses two local Fuseki steps on port `3031`:
 
-> Fuseki must be started with update support (`--update`).
-For `enriched_annotation`, Fuseki must be started with update support in /knowledge_base folder :
+1. Load `data/EDAM.owl` and generate `data/edam_neighbors.ttl`.
+2. Load `data/edam_neighbors.ttl` and enrich `data/bioschemas-dump.ttl`.
 
-```bash
-./fuseki-server --loc=/fuseki/databases/ --update /sharefair
+The output is written to:
+
+```text
+data/bioschemas-dump_enriched.ttl
 ```
 
-Check that Fuseki is available:
+To run the Fuseki steps manually:
 
 ```bash
-curl -s http://localhost:3030/$/server | jq
+$FUSEKI_HOME/fuseki-server --port=3031 --file="data/EDAM.owl" /edam
+python3 edamannot/build_edam_neighbors.py
+```
+
+Then stop the first server (Ctrl+C) and run:
+
+```bash
+$FUSEKI_HOME/fuseki-server --port=3031 --file="data/edam_neighbors.ttl" /edam
 ```
 
 ## License
